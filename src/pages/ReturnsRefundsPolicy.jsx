@@ -54,7 +54,7 @@ export default function ReturnsRefundsPolicy() {
               </h2>
               <ol className="mt-2 list-decimal space-y-1 pl-5">
                 <li>
-                  Email <b>support@yourstore.com</b> with your <b>Order ID</b>.
+                  Email <b>ssupport@vyaparvaultpvt.shop</b> with your <b>Order ID</b>.
                 </li>
                 <li>
                   Share photos/videos of the product and packaging (especially
@@ -97,7 +97,7 @@ export default function ReturnsRefundsPolicy() {
                 Need Help?
               </h2>
               <p className="mt-2">
-                Reach us at <b>support@yourstore.com</b>.
+                Reach us at <b>support@vyaparvaultpvt.shop</b>.
               </p>
             </section>
           </div>

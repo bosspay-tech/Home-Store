@@ -41,16 +41,16 @@ export default function Footer() {
               <div className="flex items-center gap-2">
                 <span>✉️</span>
                 <a
-                  href="mailto:support@yourstore.com"
+                  href="mailto:support@vyaparvaultpvt.shop"
                   className="hover:text-slate-900"
                 >
-                  support@yourstore.com
+                  support@vyaparvaultpvt.shop
                 </a>
               </div>
               <div className="flex items-center gap-2">
                 <span>📞</span>
-                <a href="tel:+910000000000" className="hover:text-slate-900">
-                  +91 00000 00000
+                <a href="tel:+919909009479" className="hover:text-slate-900">
+                  +91 9909009479
                 </a>
               </div>
             </div>

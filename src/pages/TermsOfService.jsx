@@ -107,7 +107,7 @@ export default function TermsOfService() {
                 Contact
               </h2>
               <p className="mt-2">
-                Email: <b>support@yourstore.com</b>
+                Email: <b>support@vyaparvaultpvt.shop</b>
               </p>
             </section>
           </div>

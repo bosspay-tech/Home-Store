@@ -81,7 +81,7 @@ export default function PrivacyPolicy() {
               <p className="mt-2">
                 You can request access, correction, or deletion of your personal
                 data (subject to legal/operational requirements). Contact us at{" "}
-                <b>support@yourstore.com</b>.
+                <b>support@vyaparvaultpvt.shop</b>.
               </p>
             </section>
 
@@ -90,7 +90,7 @@ export default function PrivacyPolicy() {
                 Contact
               </h2>
               <p className="mt-2">
-                Email: <b>support@yourstore.com</b>
+                Email: <b>support@vyaparvaultpvt.shop</b>
               </p>
             </section>
           </div>

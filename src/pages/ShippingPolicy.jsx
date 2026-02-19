@@ -90,7 +90,7 @@ export default function ShippingPolicy() {
                 Need Help?
               </h2>
               <p className="mt-2">
-                Contact us at <b>support@yourstore.com</b> with your order ID.
+                Contact us at <b>support@vyaparvaultpvt.shop</b> with your order ID.
               </p>
             </section>
           </div>
