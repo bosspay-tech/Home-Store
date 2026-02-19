@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination, Navigation } from "swiper/modules";
 
@@ -23,26 +23,57 @@ const COLLECTION_IMAGES = {
 };
 
 export default function Landing() {
+  const navigate = useNavigate()
   return (
     <div className="bg-white">
-      {/* NEW HERO: Standalone Banner Images (Swiper) */}
       <section className="relative">
         <Swiper
           modules={[Autoplay, Pagination, Navigation]}
           loop
           autoplay={{ delay: 3500, disableOnInteraction: false }}
           pagination={{ clickable: true }}
-          navigation
           className="h-65 w-full sm:h-90 md:h-130"
         >
           {HERO_BANNERS.map((src, idx) => (
             <SwiperSlide key={src}>
-              <img
-                src={src}
-                alt={`Hero banner ${idx + 1}`}
-                className="h-full w-full object-cover"
-                loading={idx === 0 ? "eager" : "lazy"}
-              />
+              <div className="relative h-full w-full">
+                <img
+                  src={src}
+                  alt={`Hero banner ${idx + 1}`}
+                  className="h-full w-full object-cover"
+                  loading={idx === 0 ? "eager" : "lazy"}
+                />
+
+                {/* Overlay */}
+                <div className="absolute inset-0 flex items-end sm:items-center">
+                  {/* gradient for readability */}
+                  <div className="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-transparent sm:bg-linear-to-r sm:from-black/50 sm:via-black/10 sm:to-transparent" />
+
+                  <div className="relative z-10 w-full p-5 sm:p-10">
+                    <div className="max-w-xl">
+                      <p className="text-xs font-semibold tracking-widest text-white/90 uppercase">
+                        New arrivals
+                      </p>
+                      <h2 className="mt-2 text-2xl font-extrabold text-white sm:text-4xl">
+                        Discover our best picks
+                      </h2>
+                      <p className="mt-2 text-sm text-white/90 sm:text-base">
+                        Fresh drops, great deals, fast delivery.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigate("/products"); 
+                        }}
+                        className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-white/30"
+                      >
+                        Shop Now <span className="text-base">→</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </SwiperSlide>
           ))}
         </Swiper>
