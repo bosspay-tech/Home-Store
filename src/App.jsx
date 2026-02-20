@@ -17,6 +17,7 @@ import ShippingPolicy from "./pages/ShippingPolicy";
 import ReturnsRefundsPolicy from "./pages/ReturnsRefundsPolicy";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import ContactPage from "./pages/ContactPage";
 const App = () => {
   return (
     <Router>
@@ -36,6 +37,7 @@ const App = () => {
         <Route path="/returns" element={<ReturnsRefundsPolicy />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route
           path="/orders"
           element={
