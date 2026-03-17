@@ -54,6 +54,7 @@ export default function Login() {
       const { error } = await signIn(email.trim(), password);
       if (error)
         setFormError(error.message || "Login failed. Please try again.");
+      else nav('/');
     } catch (err) {
       setFormError("Something went wrong. Please try again.");
     } finally {
