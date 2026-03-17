@@ -11,87 +11,134 @@ export default function ReturnsRefundsPolicy() {
           </p>
 
           <div className="mt-8 space-y-6 text-sm leading-6 text-slate-700">
+            {/* Return Window */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
                 Return Window
               </h2>
               <p className="mt-2">
-                You can request a return within <b>7 days</b> of delivery.
-                Returns are subject to inspection and eligibility.
+                Return requests must be raised within <b>7 days</b> of delivery.
+                Requests submitted after this period may not be accepted.
               </p>
             </section>
 
+            {/* Eligibility */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Eligible Reasons
+                Eligibility
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>Wrong item delivered</li>
-                <li>Item arrived damaged or leaking</li>
-                <li>Missing items in the package</li>
-                <li>Expired / near-expiry item received (if applicable)</li>
+                <li>
+                  Returns are accepted only if you received an incorrect item or
+                  an item not listed on your bill due to our error.
+                </li>
+                <li>
+                  Customers are strongly advised to record a video while opening
+                  the parcel as proof for damaged or incorrect items.
+                </li>
+                <li>
+                  For branded items, returns are accepted only if original
+                  packaging and all contents are intact.
+                </li>
+                <li>
+                  Personalized or customized products cannot be cancelled or
+                  returned once processed.
+                </li>
               </ul>
             </section>
 
+            {/* Return Authorization */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Non-Returnable Items
+                Return Authorization & Process
               </h2>
-              <p className="mt-2 text-slate-600">
-                For hygiene and safety, we may not accept returns for opened or
-                used consumables.
-              </p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>Opened/used disinfectants, floor cleaners, wipes</li>
-                <li>Items with missing seals/labels</li>
-                <li>Products damaged due to customer mishandling</li>
+                <li>
+                  A return authorization is mandatory before sending any product
+                  back.
+                </li>
+                <li>
+                  Products sent without authorization will be returned to the
+                  sender.
+                </li>
+                <li>
+                  Once approved, we will provide a return shipping label or
+                  instructions.
+                </li>
+                <li>
+                  Customers must securely pack the product with all original
+                  contents. Original packaging is recommended.
+                </li>
+                <li>
+                  We recommend recording a video while packing the return. Our
+                  team may also record an unboxing video upon receipt for
+                  verification.
+                </li>
               </ul>
             </section>
 
+            {/* How to Request */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
                 How to Request a Return
               </h2>
               <ol className="mt-2 list-decimal space-y-1 pl-5">
                 <li>
-                  Email <b>ssupport@vyaparvaultpvt.shop</b> with your <b>Order ID</b>.
+                  Email <b>support@vyaparvaultpvt.shop</b> with your{" "}
+                  <b>Order ID</b>.
                 </li>
                 <li>
-                  Share photos/videos of the product and packaging (especially
-                  if damaged/leaking).
+                  Share images or video evidence of the issue (damaged/incorrect
+                  item).
                 </li>
-                <li>
-                  We will confirm eligibility and arrange pickup if needed.
-                </li>
+                <li>Our team will verify and confirm the next steps.</li>
               </ol>
             </section>
 
+            {/* Refunds */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Refund Timelines
+                Refunds
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                  Once the return is approved/received, refunds are processed
-                  within <b>5–10 business days</b>.
+                  Once the returned item passes inspection, refunds are
+                  processed within <b>5–10 business days</b>.
                 </li>
                 <li>
-                  Refunds are made to the original payment method (or as store
-                  credit if applicable).
+                  Refunds are issued to the original payment method or via bank
+                  transfer/UPI (for COD orders).
                 </li>
+                <li>Packaging and shipping charges are non-refundable.</li>
               </ul>
             </section>
 
+            {/* Replacement */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Replacement Option
+                Replacement
               </h2>
               <p className="mt-2">
-                For damaged/wrong items, we may offer replacement (subject to
-                availability) as a faster resolution.
+                If the product is eligible, we may offer a replacement of the
+                same item (subject to availability). If unavailable, a refund or
+                store credit will be provided.
               </p>
             </section>
 
+            {/* Damaged */}
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                Damaged / Incorrect Item
+              </h2>
+              <p className="mt-2">
+                If you receive a damaged or incorrect item, please contact us
+                within <b>48 hours</b> of delivery with supporting images or
+                video proof. We will resolve the issue via replacement or
+                refund.
+              </p>
+            </section>
+
+            {/* Contact */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
                 Need Help?

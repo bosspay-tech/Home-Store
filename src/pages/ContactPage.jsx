@@ -46,6 +46,14 @@ const ContactPage = () => {
                   <p className="font-semibold text-lg">Call Us</p>
                   <p className="text-indigo-100">+91 9909009479</p>
                 </div>
+                <div>
+                  <p className="font-semibold text-lg">GST</p>
+                  <p className="text-indigo-100">24AALCV4036H1ZA</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-lg">CIN</p>
+                  <p className="text-indigo-100">U47912GJ2025PTC167384</p>
+                </div>
               </div>
 
               <div className="flex items-center space-x-4">

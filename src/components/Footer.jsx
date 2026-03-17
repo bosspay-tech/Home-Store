@@ -36,22 +36,31 @@ export default function Footer() {
               </span>
             </div>
 
-            {/* Contact */}
-            <div className="mt-6 space-y-2 text-sm text-slate-600">
-              <div className="flex items-center gap-2">
-                <span>✉️</span>
-                <a
-                  href="mailto:support@vyaparvaultpvt.shop"
-                  className="hover:text-slate-900"
-                >
-                  support@vyaparvaultpvt.shop
-                </a>
+            <div className="mt-5 rounded-2xl border border-white/10 bg-slate-300 p-4 backdrop-blur">
+              <div className="text-sm font-semibold text-slate-900">
+                Registered Office
               </div>
-              <div className="flex items-center gap-2">
-                <span>📞</span>
-                <a href="tel:+919909009479" className="hover:text-slate-900">
-                  +91 9909009479
-                </a>
+
+              <div className="mt-2 text-xs text-slate-800 leading-5">
+                VYAAPAR VAULT PRIVATE LIMITED
+                <br />
+                B-1225, Dev Atelier,
+                <br />
+                Anandnagar Cross Road, Satellite,
+                <br />
+                Ahmedabad, Gujarat - 380015
+              </div>
+
+              <div className="mt-3 text-xs text-slate-800">
+                📞 +91 9909009479
+              </div>
+
+              <div className="mt-2 text-xs text-slate-800">
+                GST: 24AALCV4036H1ZA
+              </div>
+
+              <div className="mt-1 text-xs text-slate-800">
+                CIN: U47912GJ2025PTC167384
               </div>
             </div>
           </div>
