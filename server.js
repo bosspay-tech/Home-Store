@@ -45,9 +45,9 @@ function buildHeaders(apiKey, method, timestamp, signature, idempotencyKey) {
   const headers = {
     "Content-Type": "application/json",
     "x-api-key": apiKey,
-    "X-Timestamp": timestamp,
-    "X-Method": method,
-    "X-Signature": signature,
+    "x-nonce": timestamp,
+    "x-method": method,
+    "x-signature": signature,
   };
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
   return headers;
