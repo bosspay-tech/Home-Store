@@ -53,7 +53,7 @@ export default function Checkout() {
       setError("");
       setLoading(true);
 
-      const collectRef = "ORD_" + Date.now();
+      const collectRef = "ORD" + Date.now();
 
       // 1. Create order in Supabase with pending status
       await createOrder(collectRef, customer);
