@@ -4,60 +4,15 @@ import { supabase } from "../lib/supabase";
 import { useCartStore } from "../store/cart.store";
 import { STORE_ID } from "../config/store";
 import { useAuth } from "../features/auth/useAuth";
-import { submitPaymentForm } from "sabpaisa-pg-dev";
 import CheckoutDetailsModal from "../components/CheckoutDetailsModal";
 
-const clientCode = import.meta.env.VITE_SABPAISA_CLIENT_CODE;
-const transUserName = import.meta.env.VITE_SABPAISA_USERNAME;
-const transUserPassword = import.meta.env.VITE_SABPAISA_PASSWORD;
-const authKey = import.meta.env.VITE_SABPAISA_AUTHENTICATION_KEY;
-const authIV = import.meta.env.VITE_SABPAISA_AUTHENTICATION_IV;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function formatMoney(n) {
   const num = Number(n || 0);
   return `₹${num.toFixed(0)}`;
 }
-
-const generateTxnId = () => {
-  return "TXN_" + Date.now();
-};
-
-const defaultValues = {
-  clientCode: clientCode || "XXXXX",
-  transUserName: transUserName || "XXXXXX",
-  transUserPassword: transUserPassword || "XXXXXXXX",
-  authKey: authKey || "XXXXXXXXXXXXXXXXXXXXXXX",
-  authIV: authIV || "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  payerName: "",
-  payerEmail: "",
-  payerMobile: "",
-  amount: 0,
-  amountType: "INR",
-  clientTxnId: "",
-  channelId: "npm",
-  udf1: null,
-  udf2: null,
-  udf3: null,
-  udf4: null,
-  udf5: null,
-  udf6: null,
-  udf7: null,
-  udf8: null,
-  udf9: null,
-  udf10: null,
-  udf11: null,
-  udf12: null,
-  udf13: null,
-  udf14: null,
-  udf15: null,
-  udf16: null,
-  udf17: null,
-  udf18: null,
-  udf19: null,
-  udf20: null,
-  env: "STAG",
-  callbackUrl: `${window.location.origin}/order-success`,
-};
 
 export default function Checkout() {
   const { items, total } = useCartStore();
@@ -73,13 +28,13 @@ export default function Checkout() {
     [items],
   );
 
-  const createOrder = async (txnId, customer) => {
+  const createOrder = async (collectRef, customer) => {
     const { error } = await supabase.from("orders").insert({
       store_id: STORE_ID,
       user_id: user?.id || null,
       items,
       total: subtotal,
-      transaction_id: txnId,
+      transaction_id: collectRef,
       status: "pending",
       customer_name: customer.name,
       customer_email: customer.email,
@@ -100,24 +55,38 @@ export default function Checkout() {
       setError("");
       setLoading(true);
 
-      const txnId = generateTxnId();
+      const collectRef = "ORD_" + Date.now();
 
-      await createOrder(txnId, customer);
+      // 1. Create order in Supabase with pending status
+      await createOrder(collectRef, customer);
 
-      const paymentData = {
-        ...defaultValues,
-        payerName: customer.name,
-        payerEmail: customer.email,
-        payerMobile: customer.phone,
-        amount: subtotal,
-        clientTxnId: txnId,
-        udf1: customer.address,
-        udf2: customer.city,
-        udf3: customer.state,
-        udf4: customer.pincode,
-      };
+      // 2. Call our edge function to create 19Pay collect
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/create-payment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            amount: subtotal,
+            collect_ref: collectRef,
+            display_name: customer.name,
+            txn_note: `Order ${collectRef}`,
+            idempotency_key: collectRef,
+          }),
+        },
+      );
 
-      submitPaymentForm(paymentData);
+      const data = await response.json();
+
+      if (!data.success || !data.checkoutUrl) {
+        throw new Error(data.error || "Failed to create payment");
+      }
+
+      // 3. Redirect to 19Pay hosted checkout
+      window.location.href = data.checkoutUrl;
     } catch (err) {
       setError(err.message || "Something went wrong.");
       setLoading(false);
@@ -181,7 +150,7 @@ export default function Checkout() {
 
           {!user ? (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              You’re placing this order as a{" "}
+              You're placing this order as a{" "}
               <span className="font-semibold">guest</span>.
             </div>
           ) : null}

@@ -1,11 +1,10 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useCartStore } from "../store/cart.store";
-import { parsePaymentResponse } from "sabpaisa-pg-dev";
 
-const authKey = import.meta.env.VITE_SABPAISA_AUTHENTICATION_KEY;
-const authIV = import.meta.env.VITE_SABPAISA_AUTHENTICATION_IV;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -13,220 +12,113 @@ function formatMoney(value) {
   return `₹${num.toFixed(0)}`;
 }
 
-function normalizeObject(data) {
-  if (!data) return {};
-
-  if (typeof data === "object" && !Array.isArray(data)) {
-    return data;
-  }
-
-  if (typeof data === "string") {
-    try {
-      const parsed = JSON.parse(data);
-      return parsed && typeof parsed === "object" ? parsed : { raw: data };
-    } catch {
-      return { raw: data };
-    }
-  }
-
-  return { raw: String(data) };
-}
-
-function getValue(obj, keys = []) {
-  if (!obj || typeof obj !== "object") return "";
-
-  for (const key of keys) {
-    if (
-      obj[key] !== undefined &&
-      obj[key] !== null &&
-      String(obj[key]).trim() !== ""
-    ) {
-      return obj[key];
-    }
-
-    const matchedKey = Object.keys(obj).find(
-      (existingKey) => existingKey.toLowerCase() === key.toLowerCase(),
-    );
-
-    if (
-      matchedKey &&
-      obj[matchedKey] !== undefined &&
-      obj[matchedKey] !== null &&
-      String(obj[matchedKey]).trim() !== ""
-    ) {
-      return obj[matchedKey];
-    }
-  }
-
-  return "";
-}
-
-function resolvePaymentStatus(response) {
-  const statusValue = String(
-    getValue(response, [
-      "status",
-      "txnStatus",
-      "paymentStatus",
-      "spRespStatus",
-      "responseStatus",
-      "txn_status",
-      "payment_status",
-      "responseCode",
-      "spRespCode",
-    ]) || "",
-  ).toLowerCase();
-
-  const messageValue = String(
-    getValue(response, [
-      "message",
-      "statusMessage",
-      "responseMessage",
-      "spRespMessage",
-      "statusDesc",
-      "txnMessage",
-    ]) || "",
-  ).toLowerCase();
-
-  const combined = `${statusValue} ${messageValue}`;
-
-  const successChecks = [
-    "success",
-    "successful",
-    "succeeded",
-    "captured",
-    "completed",
-    "approved",
-    "paid",
-    "0300",
-  ];
-
-  const failedChecks = [
-    "fail",
-    "failed",
-    "failure",
-    "declined",
-    "cancelled",
-    "canceled",
-    "aborted",
-    "error",
-    "invalid",
-  ];
-
-  if (successChecks.some((word) => combined.includes(word))) {
-    return "success";
-  }
-
-  if (failedChecks.some((word) => combined.includes(word))) {
-    return "failed";
-  }
-
-  return "unknown";
-}
-
 export default function OrderSuccess() {
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { clearCart } = useCartStore();
   const handledRef = useRef(false);
 
-  const [responseEntries, setResponseEntries] = useState([]);
   const [status, setStatus] = useState("processing");
   const [txnId, setTxnId] = useState("");
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
 
-  const updateOrder = async (transactionId, orderStatus) => {
-    if (!transactionId) return;
-
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: orderStatus })
-      .eq("transaction_id", transactionId);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-  };
-
   useEffect(() => {
     if (handledRef.current) return;
     handledRef.current = true;
 
-    const parseResponse = async () => {
+    const checkPayment = async () => {
       try {
-        const data = await parsePaymentResponse(authKey, authIV);
-        const parsed = normalizeObject(data);
+        // The collect_ref is passed back as a query param or we read it
+        // from the URL that 19Pay redirects to
+        const collectRef =
+          searchParams.get("collect_ref") ||
+          searchParams.get("collectRef") ||
+          searchParams.get("order_id") ||
+          "";
 
-        setResponseEntries(Object.entries(parsed));
-
-        const query = new URLSearchParams(location.search);
-
-        const resolvedTxnId = String(
-          getValue(parsed, [
-            "clientTxnId",
-            "client_txn_id",
-            "clientTransactionId",
-            "txnId",
-            "txn_id",
-            "transId",
-            "transactionId",
-          ]) ||
-            query.get("clientTxnId") ||
-            query.get("txnId") ||
-            "",
-        );
-
-        const resolvedAmount = String(
-          getValue(parsed, [
-            "amount",
-            "txnAmount",
-            "paidAmount",
-            "transAmount",
-          ]) ||
-            query.get("amount") ||
-            "",
-        );
-
-        const resolvedMessage = String(
-          getValue(parsed, [
-            "message",
-            "statusMessage",
-            "responseMessage",
-            "spRespMessage",
-            "statusDesc",
-            "txnMessage",
-          ]) || "",
-        );
-
-        const resolvedStatus = resolvePaymentStatus(parsed);
-
-        setTxnId(resolvedTxnId);
-        setAmount(resolvedAmount);
-        setMessage(resolvedMessage);
-
-        if (resolvedStatus === "success") {
-          await updateOrder(resolvedTxnId, "success");
-          clearCart();
-          setStatus("success");
-          return;
-        }
-
-        if (resolvedStatus === "failed") {
-          await updateOrder(resolvedTxnId, "failed");
+        if (!collectRef) {
+          setMessage("No payment reference found in the URL.");
           setStatus("failed");
           return;
         }
 
-        await updateOrder(resolvedTxnId, "pending");
+        setTxnId(collectRef);
+
+        // First check our local DB — the webhook may have already updated it
+        const { data: order } = await supabase
+          .from("orders")
+          .select("status, total")
+          .eq("transaction_id", collectRef)
+          .single();
+
+        if (order) {
+          setAmount(String(order.total || ""));
+
+          if (order.status === "success") {
+            clearCart();
+            setStatus("success");
+            return;
+          }
+          if (order.status === "failed") {
+            setStatus("failed");
+            return;
+          }
+        }
+
+        // If still pending, poll the 19Pay status API
+        const response = await fetch(
+          `${SUPABASE_URL}/functions/v1/payment-status`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ collect_refs: [collectRef] }),
+          },
+        );
+
+        const result = await response.json();
+
+        if (result.success && result.data?.length > 0) {
+          const payment = result.data[0];
+          const paymentStatus = (payment.status || "").toUpperCase();
+
+          if (paymentStatus === "SUCCESS" || paymentStatus === "CAPTURED") {
+            await supabase
+              .from("orders")
+              .update({ status: "success" })
+              .eq("transaction_id", collectRef);
+            clearCart();
+            setStatus("success");
+            return;
+          }
+
+          if (
+            paymentStatus === "FAILED" ||
+            paymentStatus === "DECLINED" ||
+            paymentStatus === "CANCELLED"
+          ) {
+            await supabase
+              .from("orders")
+              .update({ status: "failed" })
+              .eq("transaction_id", collectRef);
+            setStatus("failed");
+            return;
+          }
+        }
+
+        // Still pending
         setStatus("unknown");
       } catch (error) {
-        console.error("Error parsing payment response:", error);
-        setMessage(error?.message || "Unable to verify payment response.");
+        console.error("Error checking payment:", error);
+        setMessage(error?.message || "Unable to verify payment.");
         setStatus("failed");
       }
     };
 
-    parseResponse();
-  }, [clearCart, location.search]);
+    checkPayment();
+  }, [clearCart, searchParams]);
 
   if (status === "processing") {
     return (
@@ -269,13 +161,13 @@ export default function OrderSuccess() {
             {isSuccess
               ? "Your order has been placed successfully."
               : isUnknown
-                ? "We received a payment response, but the final status could not be confirmed yet."
+                ? "We received a payment response, but the final status could not be confirmed yet. It may take a few moments."
                 : message || "Something went wrong with your payment."}
           </p>
 
           {txnId ? (
             <div className="mt-4 text-xs text-slate-500">
-              Transaction ID: <span className="font-semibold">{txnId}</span>
+              Order Ref: <span className="font-semibold">{txnId}</span>
             </div>
           ) : null}
 
@@ -315,30 +207,6 @@ export default function OrderSuccess() {
               🔒 Secure payments
             </span>
           </div>
-
-          {responseEntries.length ? (
-            <details className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                Payment response details
-              </summary>
-
-              <div className="mt-3 space-y-2 text-xs text-slate-600">
-                {responseEntries.map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="flex items-start justify-between gap-3 border-b border-slate-200 pb-2"
-                  >
-                    <span className="font-medium text-slate-700">{key}</span>
-                    <span className="text-right break-all">
-                      {typeof value === "object"
-                        ? JSON.stringify(value)
-                        : String(value)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-500">
