@@ -46,6 +46,7 @@ function buildHeaders(apiKey, method, timestamp, signature, idempotencyKey) {
     "Content-Type": "application/json",
     "x-api-key": apiKey,
     "x-nonce": timestamp,
+    "x-timestamp": timestamp,
     "x-method": method,
     "x-signature": signature,
   };
