@@ -55,7 +55,7 @@ function buildHeaders(apiKey, timestamp, nonce, signature, idempotencyKey) {
 // ─── POST /api/create-payment ───────────────────────────────────
 app.post("/api/create-payment", async (req, res) => {
   try {
-    const { amount, collect_ref, display_name, txn_note, idempotency_key } =
+    const { amount, collect_ref, display_name, txn_note, idempotency_key, user_ref } =
       req.body;
 
     if (!amount || amount <= 0) {
@@ -66,6 +66,7 @@ app.post("/api/create-payment", async (req, res) => {
     if (collect_ref) body.collect_ref = collect_ref;
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
+    body.payer = { user_ref: user_ref || collect_ref };
 
     const method = "collect";
     const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
