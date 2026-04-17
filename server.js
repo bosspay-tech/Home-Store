@@ -44,7 +44,7 @@ function signRequest(apiKey, salt, method, body) {
 function buildHeaders(apiKey, method, timestamp, signature, idempotencyKey) {
   const headers = {
     "Content-Type": "application/json",
-    "X-NP-KEY": apiKey,
+    "x-api-key": apiKey,
     "X-Timestamp": timestamp,
     "X-Method": method,
     "X-Signature": signature,
