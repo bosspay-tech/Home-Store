@@ -6,8 +6,6 @@ import { STORE_ID } from "../config/store";
 import { useAuth } from "../features/auth/useAuth";
 import CheckoutDetailsModal from "../components/CheckoutDetailsModal";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function formatMoney(n) {
   const num = Number(n || 0);
@@ -60,24 +58,18 @@ export default function Checkout() {
       // 1. Create order in Supabase with pending status
       await createOrder(collectRef, customer);
 
-      // 2. Call our edge function to create 19Pay collect
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/create-payment`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            amount: subtotal,
-            collect_ref: collectRef,
-            display_name: customer.name,
-            txn_note: `Order ${collectRef}`,
-            idempotency_key: collectRef,
-          }),
-        },
-      );
+      // 2. Call our server to create 19Pay collect
+      const response = await fetch("/api/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: subtotal,
+          collect_ref: collectRef,
+          display_name: customer.name,
+          txn_note: `Order ${collectRef}`,
+          idempotency_key: collectRef,
+        }),
+      });
 
       const data = await response.json();
 

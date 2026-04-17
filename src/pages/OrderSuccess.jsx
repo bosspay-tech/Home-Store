@@ -3,8 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useCartStore } from "../store/cart.store";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function formatMoney(value) {
   const num = Number(value || 0);
@@ -66,17 +64,11 @@ export default function OrderSuccess() {
         }
 
         // If still pending, poll the 19Pay status API
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/payment-status`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({ collect_refs: [collectRef] }),
-          },
-        );
+        const response = await fetch("/api/payment-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ collect_refs: [collectRef] }),
+        });
 
         const result = await response.json();
 
