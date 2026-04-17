@@ -4,7 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 const NP_KEY = Deno.env.get("NP_KEY")!;
 const NP_SALT = Deno.env.get("NP_SALT")!;
 const NP_API_BASE =
-  Deno.env.get("NP_API_BASE") || "https://public.nineteenapis.online";
+  Deno.env.get("NP_API_BASE") || "https://nineteenapis.online";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

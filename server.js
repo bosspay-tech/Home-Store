@@ -13,7 +13,7 @@ const NP_KEY = process.env.NP_KEY;
 const NP_SALT = process.env.NP_SALT;
 const NP_WEBHOOK_SECRET = process.env.NP_WEBHOOK_SECRET;
 const NP_API_BASE =
-  process.env.NP_API_BASE || "https://public.nineteenapis.online";
+  process.env.NP_API_BASE || "https://nineteenapis.online";
 
 // ─── Middleware ──────────────────────────────────────────────────
 app.use(cors());
@@ -78,12 +78,35 @@ app.post("/api/create-payment", async (req, res) => {
       idempotency_key,
     );
 
-    const response = await fetch(
-      `${NP_API_BASE}/api/v2/payments/nsdl/collect`,
-      { method: "POST", headers, body: JSON.stringify(body) },
-    );
+    const url = `${NP_API_BASE}/api/v2/payments/nsdl/collect`;
+    const requestBody = JSON.stringify(body);
 
-    const data = await response.json();
+    console.log("===== 19PAY REQUEST =====");
+    console.log("URL:", url);
+    console.log("Headers:", JSON.stringify(headers, null, 2));
+    console.log("Body:", requestBody);
+    console.log("=========================");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: requestBody,
+    });
+
+    const responseText = await response.text();
+
+    console.log("===== 19PAY RESPONSE =====");
+    console.log("Status:", response.status, response.statusText);
+    console.log("Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+    console.log("Body:", responseText);
+    console.log("==========================");
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { message: responseText };
+    }
 
     if (!response.ok || !data.success) {
       console.error("19Pay collect error:", data);
