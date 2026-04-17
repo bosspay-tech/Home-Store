@@ -31,9 +31,8 @@ function sortObject(obj) {
 
 function signRequest(apiKey, salt, method, body) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const sortedBody = sortObject(body);
-  const stringToSign =
-    apiKey + timestamp + method + JSON.stringify(sortedBody);
+  const nonce = crypto.randomBytes(16).toString("hex");
+const stringToSign = apiKey + timestamp + nonce + JSON.stringify(body);
   const signature = crypto
     .createHmac("sha256", salt)
     .update(stringToSign)
@@ -42,14 +41,13 @@ function signRequest(apiKey, salt, method, body) {
 }
 
 function buildHeaders(apiKey, method, timestamp, signature, idempotencyKey) {
-  const headers = {
+ const headers = {
     "Content-Type": "application/json",
     "x-api-key": apiKey,
-    "x-nonce": timestamp,
     "x-timestamp": timestamp,
-    "x-method": method,
+    "x-nonce": nonce,
     "x-signature": signature,
-  };
+};
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
   return headers;
 }
