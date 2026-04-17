@@ -37,17 +37,17 @@ const stringToSign = apiKey + timestamp + nonce + JSON.stringify(body);
     .createHmac("sha256", salt)
     .update(stringToSign)
     .digest("hex");
-  return { signature, timestamp };
+  return { signature, timestamp, nonce };
 }
 
-function buildHeaders(apiKey, method, timestamp, signature, idempotencyKey) {
- const headers = {
+function buildHeaders(apiKey, timestamp, nonce, signature, idempotencyKey) {
+  const headers = {
     "Content-Type": "application/json",
     "x-api-key": apiKey,
     "x-timestamp": timestamp,
     "x-nonce": nonce,
     "x-signature": signature,
-};
+  };
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
   return headers;
 }
@@ -68,11 +68,11 @@ app.post("/api/create-payment", async (req, res) => {
     if (txn_note) body.txn_note = txn_note;
 
     const method = "collect";
-    const { signature, timestamp } = signRequest(NP_KEY, NP_SALT, method, body);
+    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
     const headers = buildHeaders(
       NP_KEY,
-      method,
       timestamp,
+      nonce,
       signature,
       idempotency_key,
     );
@@ -208,8 +208,8 @@ app.post("/api/payment-status", async (req, res) => {
 
     const body = { collect_ref_or: collect_refs };
     const method = "collect";
-    const { signature, timestamp } = signRequest(NP_KEY, NP_SALT, method, body);
-    const headers = buildHeaders(NP_KEY, method, timestamp, signature);
+    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
+    const headers = buildHeaders(NP_KEY, timestamp, nonce, signature);
 
     const response = await fetch(
       `${NP_API_BASE}/api/v2/payments/nsdl/status`,
