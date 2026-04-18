@@ -55,7 +55,7 @@ function buildHeaders(apiKey, timestamp, nonce, signature, idempotencyKey) {
 // ─── POST /api/create-payment ───────────────────────────────────
 app.post("/api/create-payment", async (req, res) => {
   try {
-    const { amount, collect_ref, display_name, txn_note, idempotency_key } =
+    const { amount, collect_ref, display_name, txn_note, idempotency_key, user_ref } =
       req.body;
 
     if (!amount || amount <= 0) {
@@ -66,6 +66,10 @@ app.post("/api/create-payment", async (req, res) => {
     if (collect_ref) body.collect_ref = collect_ref;
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
+    // NSDL requires payer.user_ref (min 5 alphanumeric chars, no special chars)
+    // Use customer phone (digits only), fall back to collect_ref
+    const rawRef = user_ref || collect_ref || "guest";
+    body.payer = { user_ref: rawRef.replace(/[^a-zA-Z0-9]/g, "") };
 
     const method = "collect";
     const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);

@@ -68,6 +68,7 @@ export default function Checkout() {
           display_name: customer.name,
           txn_note: `Order ${collectRef}`,
           idempotency_key: collectRef,
+          user_ref: customer.phone,
         }),
       });
 
