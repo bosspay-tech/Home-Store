@@ -66,7 +66,11 @@ app.post("/api/create-payment", async (req, res) => {
     if (collect_ref) body.collect_ref = collect_ref;
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
-    body.payer = { user_ref: user_ref || collect_ref };
+    if (user_ref) {
+      // Ensure phone has country code prefix for NSDL
+      const formattedRef = user_ref.startsWith("+") ? user_ref : "+91" + user_ref;
+      body.payer = { user_ref: formattedRef };
+    }
 
     const method = "collect";
     const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
@@ -112,14 +116,34 @@ app.post("/api/create-payment", async (req, res) => {
       console.error("19Pay collect error:", data);
       return res.status(response.status).json({
         success: false,
-        error: data.message || "Payment creation failed",
+        error: data.message || data.raw?.error || "Payment creation failed",
+      });
+    }
+
+    // Check for downstream NSDL errors in raw field
+    if (data.raw?.error) {
+      console.error("19Pay NSDL raw error:", data.raw);
+      return res.status(400).json({
+        success: false,
+        error: data.raw.error,
+      });
+    }
+
+    // 19Pay returns checkout URL as "link", not "checkoutUrl"
+    const checkoutUrl = data.link || data.checkoutUrl;
+
+    if (!checkoutUrl) {
+      console.error("No checkout URL in 19Pay response:", data);
+      return res.status(502).json({
+        success: false,
+        error: "No checkout URL returned from payment gateway",
       });
     }
 
     return res.json({
       success: true,
-      checkoutUrl: data.checkoutUrl,
-      transactionId: data.transactionEd,
+      checkoutUrl,
+      transactionId: data.transactionId,
       collectRef: data.collectRef,
     });
   } catch (err) {
