@@ -2,27 +2,23 @@
  * 19Pay API V2 HMAC signing utility
  *
  * Signs requests per the V2 spec:
- *   stringToSign = apiKey + timestamp + method + JSON.stringify(sortedBody)
+ *   stringToSign = apiKey + timestamp + nonce + JSON.stringify(body)
  *   signature    = HMAC-SHA256(salt, stringToSign).hex()
  */
-
-function sortObject(obj: Record<string, unknown>): Record<string, unknown> {
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj).sort()) {
-    sorted[key] = obj[key];
-  }
-  return sorted;
-}
 
 export async function signRequest(
   apiKey: string,
   salt: string,
-  method: string,
   body: Record<string, unknown>,
-): Promise<{ signature: string; timestamp: string }> {
+): Promise<{ signature: string; timestamp: string; nonce: string }> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const sortedBody = sortObject(body);
-  const stringToSign = apiKey + timestamp + method + JSON.stringify(sortedBody);
+  const nonceBytes = new Uint8Array(16);
+  crypto.getRandomValues(nonceBytes);
+  const nonce = Array.from(nonceBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const stringToSign = apiKey + timestamp + nonce + JSON.stringify(body);
 
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -38,21 +34,21 @@ export async function signRequest(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return { signature, timestamp };
+  return { signature, timestamp, nonce };
 }
 
 export function buildHeaders(
   apiKey: string,
-  method: string,
   timestamp: string,
+  nonce: string,
   signature: string,
   idempotencyKey?: string,
 ): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-NP-KEY": apiKey,
+    "X-API-KEY": apiKey,
     "X-Timestamp": timestamp,
-    "X-Method": method,
+    "X-Nonce": nonce,
     "X-Signature": signature,
   };
   if (idempotencyKey) {

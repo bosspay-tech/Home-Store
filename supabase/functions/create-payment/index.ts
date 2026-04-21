@@ -42,17 +42,15 @@ Deno.serve(async (req: Request) => {
     }
     body.payer = { user_ref: rawRef };
 
-    const method = "collect";
-    const { signature, timestamp } = await signRequest(
+    const { signature, timestamp, nonce } = await signRequest(
       NP_KEY,
       NP_SALT,
-      method,
       body,
     );
     const headers = buildHeaders(
       NP_KEY,
-      method,
       timestamp,
+      nonce,
       signature,
       idempotency_key,
     );

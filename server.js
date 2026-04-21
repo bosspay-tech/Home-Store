@@ -29,7 +29,7 @@ function sortObject(obj) {
   return sorted;
 }
 
-function signRequest(apiKey, salt, method, body) {
+function signRequest(apiKey, salt, body) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomBytes(16).toString("hex");
 const stringToSign = apiKey + timestamp + nonce + JSON.stringify(body);
@@ -43,10 +43,10 @@ const stringToSign = apiKey + timestamp + nonce + JSON.stringify(body);
 function buildHeaders(apiKey, timestamp, nonce, signature, idempotencyKey) {
   const headers = {
     "Content-Type": "application/json",
-    "x-api-key": apiKey,
-    "x-timestamp": timestamp,
-    "x-nonce": nonce,
-    "x-signature": signature,
+    "X-API-KEY": apiKey,
+    "X-Timestamp": timestamp,
+    "X-Nonce": nonce,
+    "X-Signature": signature,
   };
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
   return headers;
@@ -77,8 +77,7 @@ app.post("/api/create-payment", async (req, res) => {
     }
     body.payer = { user_ref: rawRef };
 
-    const method = "collect";
-    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
+    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, body);
     const headers = buildHeaders(
       NP_KEY,
       timestamp,
@@ -237,8 +236,7 @@ app.post("/api/payment-status", async (req, res) => {
     }
 
     const body = { collect_ref_or: collect_refs };
-    const method = "collect";
-    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);
+    const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, body);
     const headers = buildHeaders(NP_KEY, timestamp, nonce, signature);
 
     const response = await fetch(
