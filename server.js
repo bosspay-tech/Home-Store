@@ -9,9 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const NP_KEY = process.env.NP_KEY;
-const NP_SALT = process.env.NP_SALT;
-const NP_WEBHOOK_SECRET = process.env.NP_WEBHOOK_SECRET;
+const NP_KEY = process.env.NP_KEY || "";
+const NP_SALT = process.env.NP_SALT || "";
+const NP_WEBHOOK_SECRET = process.env.NP_WEBHOOK_SECRET || "";
 const NP_API_BASE =
   process.env.NP_API_BASE || "https://nineteenapis.online";
 
@@ -68,8 +68,14 @@ app.post("/api/create-payment", async (req, res) => {
     if (txn_note) body.txn_note = txn_note;
     // NSDL requires payer.user_ref (min 5 alphanumeric chars, no special chars)
     // Use customer phone (digits only), fall back to collect_ref
-    const rawRef = user_ref || collect_ref || "guest";
-    body.payer = { user_ref: rawRef.replace(/[^a-zA-Z0-9]/g, "") };
+    let rawRef = (user_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+    if (rawRef.length < 5) {
+      rawRef = (collect_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+    }
+    if (rawRef.length < 5) {
+      rawRef = "guestuser";
+    }
+    body.payer = { user_ref: rawRef };
 
     const method = "collect";
     const { signature, timestamp, nonce } = signRequest(NP_KEY, NP_SALT, method, body);

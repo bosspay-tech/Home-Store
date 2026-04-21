@@ -1,18 +1,21 @@
 import { signRequest, buildHeaders } from "../_shared/hmac.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Satisfy standard TypeScript language server if Deno extension is not active
+declare const Deno: any;
+
 const NP_KEY = Deno.env.get("NP_KEY")!;
 const NP_SALT = Deno.env.get("NP_SALT")!;
 const NP_API_BASE =
   Deno.env.get("NP_API_BASE") || "https://nineteenapis.online";
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { amount, collect_ref, display_name, txn_note, idempotency_key } =
+    const { amount, collect_ref, display_name, txn_note, idempotency_key, user_ref } =
       await req.json();
 
     if (!amount || amount <= 0) {
@@ -29,6 +32,15 @@ Deno.serve(async (req) => {
     if (collect_ref) body.collect_ref = collect_ref;
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
+
+    let rawRef = (user_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+    if (rawRef.length < 5) {
+      rawRef = (collect_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+    }
+    if (rawRef.length < 5) {
+      rawRef = "guestuser";
+    }
+    body.payer = { user_ref: rawRef };
 
     const method = "collect";
     const { signature, timestamp } = await signRequest(
