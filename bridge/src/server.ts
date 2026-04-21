@@ -396,7 +396,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distPath = join(__dirname, '..', '..', 'dist'); // Bridge is in bridge/src/
 if (existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get("*", (_req, res) => {
+  app.get("/:catchAll(.*)", (_req, res) => {
     res.sendFile(join(distPath, "index.html"));
   });
 }
