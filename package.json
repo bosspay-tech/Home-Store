@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "start": "node server.js",
+    "postinstall": "npm install --prefix bridge",
+    "build": "vite build && npm run build --prefix bridge",
+    "start": "npm run start --prefix bridge",
+    "dev:backend": "npm run dev --prefix bridge",
     "lint": "eslint .",
     "preview": "vite preview"
   },
