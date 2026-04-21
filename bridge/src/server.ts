@@ -1,14 +1,14 @@
-import express, { type Request, type Response } from 'express';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import express, { type Request, type Response } from "express";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import {
   createBossPayBridge,
   toExpress,
   SupabaseTxnStore,
-} from '@bosspay/bridge-node';
-import { createClient } from '@supabase/supabase-js';
-import { createNineteenPayHandlers } from './handlers.js';
+} from "@bosspay/bridge-node";
+import { createClient } from "@supabase/supabase-js";
+import { createNineteenPayHandlers } from "./handlers.js";
 import {
   createNineteenPayCollect,
   queryNineteenPayStatus,
@@ -17,8 +17,8 @@ import {
   signRequest,
   buildHeaders,
   type NineteenPayConfig,
-} from './nineteenpay.js';
-import { startNineteenPayReconciler } from './reconciler.js';
+} from "./nineteenpay.js";
+import { startNineteenPayReconciler } from "./reconciler.js";
 
 // ── Environment ────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3000);
@@ -31,23 +31,25 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const NP_KEY = process.env.NP_KEY;
 const NP_SALT = process.env.NP_SALT;
 const NP_WEBHOOK_SECRET = process.env.NP_WEBHOOK_SECRET;
-const NP_API_BASE = process.env.NP_API_BASE ?? 'https://nineteenapis.online';
+const NP_API_BASE = process.env.NP_API_BASE ?? "https://nineteenapis.online";
 
 // ── Validate required env vars exist ───────────────────────────────
 const missing = (
   [
-    ['BOSSPAY_BRIDGE_SECRET', BRIDGE_SECRET],
-    ['BRIDGE_BASE_URL', BRIDGE_BASE_URL],
-    ['SUPABASE_URL', SUPABASE_URL],
-    ['SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY],
-    ['NP_KEY', NP_KEY],
-    ['NP_SALT', NP_SALT],
-    ['NP_WEBHOOK_SECRET', NP_WEBHOOK_SECRET],
+    ["BOSSPAY_BRIDGE_SECRET", BRIDGE_SECRET],
+    ["BRIDGE_BASE_URL", BRIDGE_BASE_URL],
+    ["SUPABASE_URL", SUPABASE_URL],
+    ["SUPABASE_SERVICE_ROLE_KEY", SUPABASE_SERVICE_ROLE_KEY],
+    ["NP_KEY", NP_KEY],
+    ["NP_SALT", NP_SALT],
+    ["NP_WEBHOOK_SECRET", NP_WEBHOOK_SECRET],
   ] as const
-).filter(([, v]) => !v).map(([k]) => k);
+)
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
 
 if (missing.length) {
-  console.error(`Missing required env vars: ${missing.join(', ')}`);
+  console.error(`Missing required env vars: ${missing.join(", ")}`);
   process.exit(1);
 }
 
@@ -75,10 +77,10 @@ const handlers = createNineteenPayHandlers(
 // ── BossPay Bridge ─────────────────────────────────────────────────
 const bridge = createBossPayBridge({
   bridgeSecret: BRIDGE_SECRET!,
-  bosspayApiBase: 'https://api.bosspay24.com', // or env BOSSPAY_API_BASE
+  bosspayApiBase: "https://api.bosspay24.com", // or env BOSSPAY_API_BASE
   handlers,
   txnStore,
-  version: '1.0.0',
+  version: "1.0.0",
 });
 
 // ── 19Pay callback-miss reconciler ──────────────────────────────
@@ -86,10 +88,10 @@ const reconciler = startNineteenPayReconciler({
   supabase: supabaseClient,
   config: nineteenPayConfig,
   bridge,
-  enabled: process.env.NINETEENPAY_RECONCILER_ENABLED !== '0',
+  enabled: process.env.NINETEENPAY_RECONCILER_ENABLED !== "0",
 });
 
-for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+for (const sig of ["SIGTERM", "SIGINT"] as const) {
   process.once(sig, () => {
     void reconciler.stop().finally(() => process.exit(0));
   });
@@ -103,8 +105,8 @@ const bridgeHandler = toExpress({
   ctx: {
     handlers,
     txnStore,
-    bosspayApiBase: 'https://api.bosspay24.com',
-    version: '1.0.0',
+    bosspayApiBase: "https://api.bosspay24.com",
+    version: "1.0.0",
   },
   bridgeSecret: BRIDGE_SECRET!,
 });
@@ -112,27 +114,34 @@ const bridgeHandler = toExpress({
 // ── 19Pay callback handler ──────────────────────────────────────
 async function handleNineteenPayCallback(req: Request, res: Response) {
   try {
-    console.log(`[nineteenpay-callback] inbound ${req.method} ${req.originalUrl}`);
+    console.log(
+      `[nineteenpay-callback] inbound ${req.method} ${req.originalUrl}`,
+    );
 
-    const timestamp = req.headers['x-tsp-timestamp'] as string || '';
-    const signature = req.headers['x-tsp-signature'] as string || '';
-    const rawBody = req.body.toString('utf8');
+    const timestamp = (req.headers["x-tsp-timestamp"] as string) || "";
+    const signature = (req.headers["x-tsp-signature"] as string) || "";
+    const rawBody = req.body.toString("utf8");
 
     const { valid, payload } = verifyNineteenPayWebhook(
       nineteenPayConfig,
       timestamp,
       signature,
-      rawBody
+      rawBody,
     );
 
     if (!valid) {
-      console.error('Webhook signature verification failed');
-      return res.status(401).send('Invalid signature');
+      console.error("Webhook signature verification failed");
+      return res.status(401).send("Invalid signature");
     }
 
-    console.log('Webhook payload:', payload);
+    console.log("Webhook payload:", payload);
 
-    const clientTxnId = payload.collect_ref || payload.collectRef || payload.orderEd || req.params['txnId'] || '';
+    const clientTxnId =
+      payload.collect_ref ||
+      payload.collectRef ||
+      payload.orderEd ||
+      req.params["txnId"] ||
+      "";
     const status = resolveNineteenPayStatus(payload.status);
 
     const amountRupees = Number(payload.amount ?? 0);
@@ -141,7 +150,7 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
     let pgTxnId = clientTxnId;
 
     if (!pgTxnId) {
-      res.status(400).send('Missing pg transaction id in 19Pay callback.');
+      res.status(400).send("Missing pg transaction id in 19Pay callback.");
       return;
     }
 
@@ -150,13 +159,16 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
     );
 
     const { data: existing, error: existingError } = await supabaseClient
-      .from('bosspay_txns')
-      .select('payment_status, amount_paisa, callback_forwarded_at')
-      .eq('pg_transaction_id', pgTxnId)
+      .from("bosspay_txns")
+      .select("payment_status, amount_paisa, callback_forwarded_at")
+      .eq("pg_transaction_id", pgTxnId)
       .maybeSingle();
 
     if (existingError) {
-      console.error('[nineteenpay-callback] failed to read existing txn row:', existingError);
+      console.error(
+        "[nineteenpay-callback] failed to read existing txn row:",
+        existingError,
+      );
     }
 
     const alreadyForwarded =
@@ -165,25 +177,27 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
       Number(existing?.amount_paisa ?? 0) === amountPaisa;
 
     await supabaseClient
-      .from('bosspay_txns')
+      .from("bosspay_txns")
       .update({
         payment_status: status,
         amount_paisa: amountPaisa,
-        gateway_payload: { source: 'webhook', parsed: payload },
+        gateway_payload: { source: "webhook", parsed: payload },
         updated_at: new Date().toISOString(),
       })
-      .eq('pg_transaction_id', pgTxnId);
+      .eq("pg_transaction_id", pgTxnId);
 
     if (alreadyForwarded) {
-      console.log(`[nineteenpay-callback] duplicate callback ignored for ${pgTxnId}`);
+      console.log(
+        `[nineteenpay-callback] duplicate callback ignored for ${pgTxnId}`,
+      );
       res.json({ received: true, duplicate: true });
       return;
     }
 
-    if (status === 'pending') {
+    if (status === "pending") {
       console.warn(
         `[nineteenpay-callback] ambiguous/pending callback for ${pgTxnId}; ` +
-        `not forwarding to BossPay yet`,
+          `not forwarding to BossPay yet`,
       );
       res.json({ received: true, forwarded: false });
       return;
@@ -192,7 +206,7 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
     console.log(`[nineteenpay-callback] forwarding via bridge for ${pgTxnId}`);
 
     const result = await bridge.forwardCallback({
-      pgType: 'nineteenpay',
+      pgType: "nineteenpay",
       pgTransactionId: pgTxnId,
       payload: {
         status,
@@ -204,11 +218,11 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
 
     console.log(
       `[nineteenpay-callback] BossPay response: HTTP ${result.status} ` +
-      `(attempts=${result.attempts}) body=${result.body}`,
+        `(attempts=${result.attempts}) body=${result.body}`,
     );
 
     await supabaseClient
-      .from('bosspay_txns')
+      .from("bosspay_txns")
       .update({
         callback_forward_http_status: result.status,
         callback_forwarded_at:
@@ -217,19 +231,23 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
             : null,
         updated_at: new Date().toISOString(),
       })
-      .eq('pg_transaction_id', pgTxnId);
+      .eq("pg_transaction_id", pgTxnId);
 
     if (result.status < 200 || result.status >= 300) {
       console.error(
         `[nineteenpay-callback] BossPay callback failed for ${pgTxnId} ` +
-        `with HTTP ${result.status}`,
+          `with HTTP ${result.status}`,
       );
     }
 
-    return res.json({ received: true, forwarded: true, forwardStatus: result.status });
+    return res.json({
+      received: true,
+      forwarded: true,
+      forwardStatus: result.status,
+    });
   } catch (err) {
-    console.error('[nineteenpay-callback] error:', err);
-    return res.status(500).send('Error processing payment callback.');
+    console.error("[nineteenpay-callback] error:", err);
+    return res.status(500).send("Error processing payment callback.");
   }
 }
 
@@ -240,28 +258,28 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
 // We need raw bodies for webhook verification
 app.use((req, res, next) => {
   const isNineteenPayCallback =
-    req.path.includes('callback/nineteenpay') ||
-    req.path.includes('/payment-webhook') ||
-    req.path.includes('/webhooks/nineteenpay');
+    req.path.includes("callback/nineteenpay") ||
+    req.path.includes("/payment-webhook") ||
+    req.path.includes("/webhooks/nineteenpay");
 
   if (isNineteenPayCallback) {
-    express.raw({ type: 'application/json' })(req, res, next);
+    express.raw({ type: "application/json" })(req, res, next);
   } else {
     // Normal JSON parsing for api endpoints etc
-    express.json({ limit: '1mb' })(req, res, next);
+    express.json({ limit: "1mb" })(req, res, next);
   }
 });
 
 // Intercept BossPay bridge routes early.
 app.use((req, res, next) => {
   const isNineteenPayCallback =
-    req.path.includes('callback/nineteenpay') ||
-    req.path.includes('/payment-webhook') ||
-    req.path.includes('/webhooks/nineteenpay');
+    req.path.includes("callback/nineteenpay") ||
+    req.path.includes("/payment-webhook") ||
+    req.path.includes("/webhooks/nineteenpay");
 
   if (isNineteenPayCallback) return next();
 
-  if (req.path.includes('/bosspay/v1/')) {
+  if (req.path.includes("/bosspay/v1/")) {
     console.log(`[bridge] ${req.method} ${req.path} → bridgeHandler`);
     return bridgeHandler(req, res, next);
   }
@@ -270,19 +288,34 @@ app.use((req, res, next) => {
 });
 
 // ── Webhook routes ──
-app.post('/api/payment-webhook', async (req, res) => handleNineteenPayCallback(req, res));
-app.post('/webhooks/nineteenpay', async (req, res) => handleNineteenPayCallback(req, res));
-app.post('/wp-json/bosspay/v1/callback/nineteenpay', async (req, res) => handleNineteenPayCallback(req, res));
-app.post('/wp-json/bosspay/v1/callback/nineteenpay/:txnId', async (req, res) => handleNineteenPayCallback(req, res));
+app.post("/api/payment-webhook", async (req, res) =>
+  handleNineteenPayCallback(req, res),
+);
+app.post("/webhooks/nineteenpay", async (req, res) =>
+  handleNineteenPayCallback(req, res),
+);
+app.post("/wp-json/bosspay/v1/callback/nineteenpay", async (req, res) =>
+  handleNineteenPayCallback(req, res),
+);
+app.post("/wp-json/bosspay/v1/callback/nineteenpay/:txnId", async (req, res) =>
+  handleNineteenPayCallback(req, res),
+);
 
 // ── Legacy Home-Store API routes (Frontend compatibility) ──
 
-app.post('/api/create-payment', async (req, res) => {
+app.post("/api/create-payment", async (req, res) => {
   try {
-    const { amount, collect_ref, display_name, txn_note, idempotency_key, user_ref } = req.body;
+    const {
+      amount,
+      collect_ref,
+      display_name,
+      txn_note,
+      idempotency_key,
+      user_ref,
+    } = req.body;
 
     if (!amount || amount <= 0) {
-      res.status(400).json({ success: false, error: 'Invalid amount' });
+      res.status(400).json({ success: false, error: "Invalid amount" });
       return;
     }
 
@@ -291,16 +324,20 @@ app.post('/api/create-payment', async (req, res) => {
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
 
-    let rawRef = (user_ref || '').replace(/[^a-zA-Z0-9]/g, '');
+    let rawRef = (user_ref || "").replace(/[^a-zA-Z0-9]/g, "");
     if (rawRef.length < 5) {
-      rawRef = (collect_ref || '').replace(/[^a-zA-Z0-9]/g, '');
+      rawRef = (collect_ref || "").replace(/[^a-zA-Z0-9]/g, "");
     }
     if (rawRef.length < 5) {
-      rawRef = 'guestuser';
+      rawRef = "guestuser";
     }
     body.payer = { user_ref: rawRef };
 
-    const { signature, timestamp, nonce } = signRequest(nineteenPayConfig.apiKey, nineteenPayConfig.salt, body);
+    const { signature, timestamp, nonce } = signRequest(
+      nineteenPayConfig.apiKey,
+      nineteenPayConfig.salt,
+      body,
+    );
     const headers = buildHeaders(
       nineteenPayConfig.apiKey,
       timestamp,
@@ -363,24 +400,38 @@ app.post('/api/create-payment', async (req, res) => {
   }
 });
 
-app.post('/api/payment-status', async (req, res) => {
+app.post("/api/payment-status", async (req, res) => {
   try {
     const { collect_refs } = req.body;
 
     if (!collect_refs || !Array.isArray(collect_refs) || !collect_refs.length) {
-      res.status(400).json({ success: false, error: "collect_refs array required" });
+      res
+        .status(400)
+        .json({ success: false, error: "collect_refs array required" });
       return;
     }
 
     const body = { collect_ref_or: collect_refs };
-    const { signature, timestamp, nonce } = signRequest(nineteenPayConfig.apiKey, nineteenPayConfig.salt, body);
-    const headers = buildHeaders(nineteenPayConfig.apiKey, timestamp, nonce, signature);
+    const { signature, timestamp, nonce } = signRequest(
+      nineteenPayConfig.apiKey,
+      nineteenPayConfig.salt,
+      body,
+    );
+    const headers = buildHeaders(
+      nineteenPayConfig.apiKey,
+      timestamp,
+      nonce,
+      signature,
+    );
 
-    const response = await fetch(`${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/status`, { 
-      method: "POST", 
-      headers, 
-      body: JSON.stringify(body) 
-    });
+    const response = await fetch(
+      `${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/status`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+    );
 
     const data = await response.json();
     res.status(response.status).json(data);
@@ -393,10 +444,10 @@ app.post('/api/payment-status', async (req, res) => {
 // ── Serve storefront equivalent directly if running within HomeStore ──
 // If the bridge is replacing server.js entirely, you can serve dist here:
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const distPath = join(__dirname, '..', '..', 'dist'); // Bridge is in bridge/src/
+const distPath = join(__dirname, "..", "..", "dist"); // Bridge is in bridge/src/
 if (existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get("/:catchAll(.*)", (_req, res) => {
+  app.get("*", (_req, res) => {
     res.sendFile(join(distPath, "index.html"));
   });
 }
