@@ -272,7 +272,8 @@ app.use((req, res, next) => {
 // ── Webhook routes ──
 app.post('/api/payment-webhook', async (req, res) => handleNineteenPayCallback(req, res));
 app.post('/webhooks/nineteenpay', async (req, res) => handleNineteenPayCallback(req, res));
-app.post('/wp-json/bosspay/v1/callback/nineteenpay/:txnId?', async (req, res) => handleNineteenPayCallback(req, res));
+app.post('/wp-json/bosspay/v1/callback/nineteenpay', async (req, res) => handleNineteenPayCallback(req, res));
+app.post('/wp-json/bosspay/v1/callback/nineteenpay/:txnId', async (req, res) => handleNineteenPayCallback(req, res));
 
 // ── Legacy Home-Store API routes (Frontend compatibility) ──
 
@@ -395,7 +396,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distPath = join(__dirname, '..', '..', 'dist'); // Bridge is in bridge/src/
 if (existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get("/{*splat}", (_req, res) => {
+  app.get("*", (_req, res) => {
     res.sendFile(join(distPath, "index.html"));
   });
 }
