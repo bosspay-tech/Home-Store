@@ -13,10 +13,11 @@ function formatMoney(n) {
 }
 
 export default function Checkout() {
-  const { items, total } = useCartStore();
+  const { items, total, clearCart } = useCartStore();
   const { user } = useAuth();
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [upiUrl, setUpiUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -78,8 +79,14 @@ export default function Checkout() {
         throw new Error(data.error || "Failed to create payment");
       }
 
-      // 3. Redirect to 19Pay hosted checkout
-      window.location.href = data.checkoutUrl;
+      // 3. Render UPI QR modal or redirect
+      if (data.checkoutUrl.startsWith("upi://")) {
+        setUpiUrl(data.checkoutUrl);
+        setLoading(false);
+        setShowCheckoutModal(false);
+      } else {
+        window.location.href = data.checkoutUrl;
+      }
     } catch (err) {
       setError(err.message || "Something went wrong.");
       setLoading(false);
@@ -299,6 +306,44 @@ export default function Checkout() {
         amount={subtotal}
         user={user}
       />
+      {upiUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm overflow-hidden text-center bg-white shadow-2xl rounded-3xl p-7 animate-in fade-in zoom-in duration-200">
+             <div className="flex justify-center mb-4">
+                <div className="flex items-center justify-center w-16 h-16 bg-blue-50 rounded-2xl">
+                   <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                   </svg>
+                </div>
+             </div>
+             <h3 className="mb-2 text-xl font-extrabold text-slate-900">Scan to Pay</h3>
+             <p className="mb-6 text-sm text-slate-500">Scan this QR code with Google Pay, PhonePe, Paytm, or any UPI app.</p>
+             <div className="inline-block p-4 mb-6 border border-slate-200 bg-slate-50/50 rounded-2xl">
+               <img 
+                 src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`} 
+                 alt="UPI QR Code"
+                 className="w-48 h-48 mx-auto mix-blend-multiply"
+               />
+             </div>
+             <p className="mb-4 text-xs font-semibold text-slate-400 tracking-wider">OR PAY ON THIS DEVICE</p>
+             <a 
+               href={upiUrl}
+               className="block w-full py-3.5 mb-3 text-sm font-semibold text-white transition bg-slate-900 hover:bg-slate-800 rounded-xl"
+             >
+               Open UPI App
+             </a>
+             <button 
+               onClick={() => {
+                 clearCart();
+                 window.location.href = "/orders";
+               }}
+               className="block w-full py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
+             >
+               I've completed the payment
+             </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
