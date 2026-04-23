@@ -255,15 +255,20 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
 // BossPay bridge routes
 // ════════════════════════════════════════════════════════════════════
 
-// We need raw bodies for webhook verification
+// We need raw bodies for webhook verification and for bridge-node HMAC (see toExpress readRawBody).
 app.use((req, res, next) => {
   const isNineteenPayCallback =
     req.path.includes("callback/nineteenpay") ||
     req.path.includes("/payment-webhook") ||
     req.path.includes("/webhooks/nineteenpay");
 
-  if (isNineteenPayCallback) {
-    express.raw({ type: "application/json" })(req, res, next);
+  const isBridgeRoute = req.path.includes("/bosspay/v1/");
+
+  if (isNineteenPayCallback || isBridgeRoute) {
+    // bridge-node needs raw bytes for HMAC; putting express.json() in front
+    // hangs readRawBody forever (stream already consumed), which manifests
+    // upstream as a Headers Timeout Error after ~8s.
+    express.raw({ type: "*/*", limit: "1mb" })(req, res, next);
   } else {
     // Normal JSON parsing for api endpoints etc
     express.json({ limit: "1mb" })(req, res, next);
