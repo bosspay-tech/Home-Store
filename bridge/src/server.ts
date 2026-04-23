@@ -114,6 +114,82 @@ const bridgeHandler = toExpress({
 });
 
 // ── 19Pay callback handler ──────────────────────────────────────
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Resolve our canonical BossPay UUID for an inbound 19Pay webhook.
+ *
+ * Lookup order (per `.cursor/rules/bosspay-context.mdc` -- PG identifier
+ * contract):
+ *   1. `provider_txn_id = payload.transactionId` (primary; the value 19Pay
+ *      gave us at /collect, echoed verbatim in every webhook)
+ *   2. Strict UUID form of the payload's `collect_ref` (legacy callers that
+ *      sent the 32-hex form intact)
+ *   3. 30-hex prefix from 19Pay's truncated `orderId` (`YYYYMMDDHHMMSS` +
+ *      first 30 hex of our UUID; fallback for rows that pre-date the
+ *      provider_txn_id migration)
+ */
+async function resolveClientTxnId(
+  payload: any,
+  rawRef: string,
+): Promise<string | null> {
+  const providerTxnId =
+    typeof payload?.transactionId === "string"
+      ? payload.transactionId.trim()
+      : "";
+
+  if (providerTxnId) {
+    const { data, error } = await supabaseClient
+      .from("bosspay_txns")
+      .select("pg_transaction_id")
+      .eq("provider_txn_id", providerTxnId)
+      .maybeSingle();
+    if (error) {
+      console.warn(
+        "[nineteenpay-callback] provider_txn_id lookup failed:",
+        error.message,
+      );
+    } else if (data?.["pg_transaction_id"]) {
+      return data["pg_transaction_id"] as string;
+    }
+  }
+
+  const mapped = fromNineteenPayRef(rawRef);
+  if (UUID_RE.test(mapped)) {
+    return mapped;
+  }
+
+  const r = (rawRef || "").replace(/-/g, "").toLowerCase();
+  if (/^\d{14}[0-9a-f]{30}$/.test(r)) {
+    const hex30 = r.slice(14);
+    const dashed =
+      `${hex30.slice(0, 8)}-${hex30.slice(8, 12)}-${hex30.slice(12, 16)}-` +
+      `${hex30.slice(16, 20)}-${hex30.slice(20)}`;
+    const { data, error } = await supabaseClient
+      .from("bosspay_txns")
+      .select("pg_transaction_id")
+      .ilike("pg_transaction_id", `${dashed}%`)
+      .limit(2);
+    if (error) {
+      console.warn(
+        "[nineteenpay-callback] prefix lookup failed:",
+        error.message,
+      );
+    } else if (data && data.length === 1) {
+      return data[0]["pg_transaction_id"] as string;
+    } else if (data && data.length > 1) {
+      console.error(
+        "[nineteenpay-callback] ambiguous 30-hex prefix match:",
+        dashed,
+      );
+    }
+  }
+
+  return null;
+}
+
 async function handleNineteenPayCallback(req: Request, res: Response) {
   try {
     console.log(
@@ -141,23 +217,34 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
     const rawRef =
       payload.collect_ref ||
       payload.collectRef ||
+      payload.orderId ||
       payload.orderEd ||
       req.params["txnId"] ||
       "";
-    // 19Pay sends back the 32-hex form we posted; rehydrate to canonical UUID
-    // so `bosspay_txns.pg_transaction_id = <uuid>` lookups keep working.
-    const clientTxnId = fromNineteenPayRef(rawRef);
+
+    // Primary: provider_txn_id (19Pay's `transactionId` from /collect, echoed
+    // verbatim in every webhook). Falls back to UUID form, then 30-hex prefix.
+    const clientTxnId = await resolveClientTxnId(payload, rawRef);
     const status = resolveNineteenPayStatus(payload.status);
 
     const amountRupees = Number(payload.amount ?? 0);
     const amountPaisa = Math.max(0, Math.round(amountRupees * 100));
 
-    let pgTxnId = clientTxnId;
-
-    if (!pgTxnId) {
-      res.status(400).send("Missing pg transaction id in 19Pay callback.");
+    if (!clientTxnId) {
+      console.error(
+        "[nineteenpay-callback] could not resolve clientTxnId from payload",
+        {
+          providerTxnId: payload?.transactionId ?? null,
+          rawRef,
+        },
+      );
+      res
+        .status(400)
+        .send("Could not resolve transaction id from 19Pay callback.");
       return;
     }
+
+    const pgTxnId = clientTxnId;
 
     console.log(
       `[nineteenpay-callback] pgTxnId=${pgTxnId} status=${status} amountPaisa=${amountPaisa}`,
@@ -208,14 +295,27 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
       return;
     }
 
-    console.log(`[nineteenpay-callback] forwarding via bridge for ${pgTxnId}`);
+    // Merchant-facing PG reference: prefer 19Pay's `transactionId` (the value
+    // they return at /collect, persisted as `provider_txn_id`, echoed in every
+    // webhook). This is the id merchants quote in support / reconciliation; the
+    // route param `pgTransactionId` stays as our internal BossPay UUID for
+    // routing in BossPay's `/api/callbacks/nineteenpay/:txnId`.
+    const merchantFacingPgRef =
+      (typeof payload?.transactionId === "string" && payload.transactionId.trim()) ||
+      (typeof payload?.upi_transaction_id === "string" && payload.upi_transaction_id.trim()) ||
+      pgTxnId;
+
+    console.log(
+      `[nineteenpay-callback] forwarding via bridge for ${pgTxnId} ` +
+        `(pg_ref=${merchantFacingPgRef})`,
+    );
 
     const result = await bridge.forwardCallback({
       pgType: "nineteenpay",
       pgTransactionId: pgTxnId,
       payload: {
         status,
-        pg_transaction_id: pgTxnId,
+        pg_transaction_id: merchantFacingPgRef,
         amount: amountPaisa,
         metadata: payload,
       },
@@ -251,7 +351,10 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
       forwardStatus: result.status,
     });
   } catch (err) {
-    console.error("[nineteenpay-callback] error:", err);
+    console.error(
+      "[nineteenpay-callback] error:",
+      err instanceof Error ? err.message : JSON.stringify(err),
+    );
     return res.status(500).send("Error processing payment callback.");
   }
 }

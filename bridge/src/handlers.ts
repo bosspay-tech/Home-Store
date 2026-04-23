@@ -12,12 +12,16 @@ import { randomCustomerProfile } from './customer-pool.js';
 // directly gives us a checkoutUrl. Kept empty if needed for extending.
 
 /**
- * Upsert `gateway_payload` on the bosspay_txns row.
+ * Upsert `gateway_payload` plus the PG-side identifiers (`provider_txn_id`,
+ * `provider_collect_ref`) on the bosspay_txns row. The PG-side ids are what
+ * we will look up by when the 19Pay webhook arrives, since 19Pay caps its
+ * `orderId` at 44 chars (14 timestamp + 30 hex of our `collect_ref`) and
+ * therefore cannot round-trip our 32-hex UUID intact.
  */
 async function persistGatewayPayload(
   supabase: SupabaseClient,
   clientTxnId: string,
-  paymentEntry: any,
+  paymentEntry: { checkoutUrl: string; transactionId: string; collectRef: string },
 ): Promise<void> {
   const delays = [100, 250, 500, 1000];
   for (let i = 0; i < delays.length; i += 1) {
@@ -26,8 +30,10 @@ async function persistGatewayPayload(
       const { data, error } = await supabase
         .from('bosspay_txns')
         .update({
-          gateway_payload: paymentEntry,
-          updated_at: new Date().toISOString(),
+          gateway_payload:      paymentEntry,
+          provider_txn_id:      paymentEntry.transactionId || null,
+          provider_collect_ref: paymentEntry.collectRef || null,
+          updated_at:           new Date().toISOString(),
         })
         .eq('pg_transaction_id', clientTxnId)
         .select('pg_transaction_id');
@@ -36,11 +42,18 @@ async function persistGatewayPayload(
         continue;
       }
       if (data && data.length > 0) {
-        console.log('[nineteenpay-createCollection] Supabase persist ok:', clientTxnId);
+        console.log(
+          '[nineteenpay-createCollection] Supabase persist ok:',
+          clientTxnId,
+          `provider_txn_id=${paymentEntry.transactionId ?? ''}`,
+        );
         return;
       }
     } catch (err) {
-      console.warn('[nineteenpay-createCollection] persist threw:', err);
+      console.warn(
+        '[nineteenpay-createCollection] persist threw:',
+        err instanceof Error ? err.message : JSON.stringify(err),
+      );
     }
   }
   console.warn(
@@ -137,7 +150,10 @@ export function createNineteenPayHandlers(
               })
               .eq('pg_transaction_id', clientTxnId);
           } catch (cacheErr) {
-            console.warn('[checkStatus] cache mirror failed:', cacheErr);
+            console.warn(
+              '[checkStatus] cache mirror failed:',
+              cacheErr instanceof Error ? cacheErr.message : JSON.stringify(cacheErr),
+            );
           }
 
           return {
@@ -146,7 +162,8 @@ export function createNineteenPayHandlers(
             amount: amountPaisa,
           };
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
+          const errMsg =
+            err instanceof Error ? err.message : JSON.stringify(err);
           console.warn(
             `[checkStatus] status API unavailable for ${clientTxnId} — ` +
             `falling back to cached callback data. Reason: ${errMsg}`,
@@ -193,7 +210,7 @@ export function createNineteenPayHandlers(
         } catch (err) {
           console.error(
             `[checkStatus] cache read threw for ${clientTxnId}:`,
-            err,
+            err instanceof Error ? err.message : JSON.stringify(err),
           );
           return {
             status: 'pending' as const,

@@ -111,7 +111,10 @@ export function startNineteenPayReconciler(opts: ReconcilerOptions): ReconcilerH
       console.log(`[reconciler] tick picked ${eligible.length} row(s) to reconcile`);
       await Promise.all(eligible.map((row) => reconcileOne(row)));
     } catch (err) {
-      console.error('[reconciler] tick threw:', err);
+      console.error(
+        '[reconciler] tick threw:',
+        err instanceof Error ? err.message : JSON.stringify(err),
+      );
     } finally {
       running = false;
     }
@@ -130,7 +133,7 @@ export function startNineteenPayReconciler(opts: ReconcilerOptions): ReconcilerH
       try {
         parsed = await queryNineteenPayStatus(opts.config, clientTxnId);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : JSON.stringify(err);
         console.warn(`[reconciler] ${pgTxnId} status-api failed: ${msg}`);
         return;
       }
@@ -163,12 +166,19 @@ export function startNineteenPayReconciler(opts: ReconcilerOptions): ReconcilerH
       let forwardHttpStatus: number | null = null;
       let forwardedAt: string | null = null;
       try {
+        // Match the webhook handler: merchant-facing `pg_transaction_id` is the
+        // 19Pay-side reference (transactionId / upi_transaction_id), while the
+        // route param `pgTransactionId` stays as our internal BossPay UUID.
+        const merchantFacingPgRef =
+          (typeof parsed?.transactionId === 'string' && parsed.transactionId.trim()) ||
+          (typeof parsed?.upi_transaction_id === 'string' && parsed.upi_transaction_id.trim()) ||
+          pgTxnId;
         const result = await opts.bridge.forwardCallback({
           pgType: 'nineteenpay',
           pgTransactionId: pgTxnId,
           payload: {
             status,
-            pg_transaction_id: pgTxnId,
+            pg_transaction_id: merchantFacingPgRef,
             amount: amountPaisa,
             metadata: parsed,
           },
@@ -182,7 +192,10 @@ export function startNineteenPayReconciler(opts: ReconcilerOptions): ReconcilerH
             `(attempts=${result.attempts})`,
         );
       } catch (err) {
-        console.error(`[reconciler] ${pgTxnId} forwardCallback threw:`, err);
+        console.error(
+          `[reconciler] ${pgTxnId} forwardCallback threw:`,
+          err instanceof Error ? err.message : JSON.stringify(err),
+        );
       }
 
       const stampPayload: Record<string, unknown> = {
@@ -200,7 +213,10 @@ export function startNineteenPayReconciler(opts: ReconcilerOptions): ReconcilerH
         console.warn(`[reconciler] ${pgTxnId} stamp update failed: ${stampErr.message}`);
       }
     } catch (err) {
-      console.error(`[reconciler] ${pgTxnId} reconcileOne threw:`, err);
+      console.error(
+        `[reconciler] ${pgTxnId} reconcileOne threw:`,
+        err instanceof Error ? err.message : JSON.stringify(err),
+      );
     } finally {
       inFlight.delete(pgTxnId);
     }

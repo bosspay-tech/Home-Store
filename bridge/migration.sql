@@ -36,3 +36,21 @@ alter table public.bosspay_txns
 --   AND created_at BETWEEN (now() - 15m) AND (now() - 10s)
 create index if not exists bosspay_txns_reconcile_idx
   on public.bosspay_txns (pg_type, callback_forwarded_at, created_at);
+
+-- ── PG identifier mapping ────────────────────────────────────────────
+-- BossPay UUID stays the row primary key (`pg_transaction_id`).
+-- The PG-side identifier returned at `/collect` (e.g. 19Pay's
+-- `transactionId`) is persisted here so callbacks can be resolved by
+-- the PG's own id even when the PG truncates/renames the `collect_ref`
+-- we sent (19Pay caps `orderId` at 44 chars = 14 timestamp + 30 hex).
+alter table public.bosspay_txns
+  add column if not exists provider_txn_id       text,
+  add column if not exists provider_collect_ref  text;
+
+-- Unique only when set, so legacy rows (NULL) don't conflict with each other.
+create unique index if not exists bosspay_txns_provider_txn_id_uk
+  on public.bosspay_txns (provider_txn_id)
+  where provider_txn_id is not null;
+
+create index if not exists bosspay_txns_provider_collect_ref_idx
+  on public.bosspay_txns (provider_collect_ref);
