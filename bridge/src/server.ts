@@ -16,6 +16,8 @@ import {
   resolveNineteenPayStatus,
   signRequest,
   buildHeaders,
+  toNineteenPayRef,
+  fromNineteenPayRef,
   type NineteenPayConfig,
 } from "./nineteenpay.js";
 import { startNineteenPayReconciler } from "./reconciler.js";
@@ -115,7 +117,7 @@ const bridgeHandler = toExpress({
 async function handleNineteenPayCallback(req: Request, res: Response) {
   try {
     console.log(
-      `[nineteenpay-callback] inbound ${req.method} ${req.originalUrl}`,
+      `[nineteenpay-callback] inbound ${req.method} ${req.originalUrl} from ${req.ip}`,
     );
 
     const timestamp = (req.headers["x-tsp-timestamp"] as string) || "";
@@ -136,12 +138,15 @@ async function handleNineteenPayCallback(req: Request, res: Response) {
 
     console.log("Webhook payload:", payload);
 
-    const clientTxnId =
+    const rawRef =
       payload.collect_ref ||
       payload.collectRef ||
       payload.orderEd ||
       req.params["txnId"] ||
       "";
+    // 19Pay sends back the 32-hex form we posted; rehydrate to canonical UUID
+    // so `bosspay_txns.pg_transaction_id = <uuid>` lookups keep working.
+    const clientTxnId = fromNineteenPayRef(rawRef);
     const status = resolveNineteenPayStatus(payload.status);
 
     const amountRupees = Number(payload.amount ?? 0);
@@ -293,6 +298,15 @@ app.use((req, res, next) => {
 });
 
 // ── Webhook routes ──
+// GET probes from ops / PG-support / 19Pay onboarding checks — keep short so
+// the SPA static handler (further down) cannot swallow them with index.html.
+app.get("/api/payment-webhook", (_req, res) => {
+  res.type("text/plain").status(200).send("19pay webhook alive");
+});
+app.get("/webhooks/nineteenpay", (_req, res) => {
+  res.type("text/plain").status(200).send("19pay webhook alive");
+});
+
 app.post("/api/payment-webhook", async (req, res) =>
   handleNineteenPayCallback(req, res),
 );
@@ -325,7 +339,7 @@ app.post("/api/create-payment", async (req, res) => {
     }
 
     const body: any = { amount: Number(amount) };
-    if (collect_ref) body.collect_ref = collect_ref;
+    if (collect_ref) body.collect_ref = toNineteenPayRef(collect_ref);
     if (display_name) body.display_name = display_name;
     if (txn_note) body.txn_note = txn_note;
 
@@ -416,7 +430,9 @@ app.post("/api/payment-status", async (req, res) => {
       return;
     }
 
-    const body = { collect_ref_or: collect_refs };
+    const body = {
+      collect_ref_or: (collect_refs as string[]).map((r) => toNineteenPayRef(r)),
+    };
     const { signature, timestamp, nonce } = signRequest(
       nineteenPayConfig.apiKey,
       nineteenPayConfig.salt,

@@ -16,6 +16,24 @@ export interface NineteenPayPaymentParams {
   idempotencyKey?: string;
 }
 
+/**
+ * 19Pay silently truncates/renames a 36-char UUID `collect_ref` on its side,
+ * so querying `/status` with the original UUID returns "Transaction not found".
+ * We therefore send a 32-char lower-case hex form (UUID with hyphens removed)
+ * and use the same form on every `/status` lookup. Canonical UUIDs stay in
+ * Supabase and in every field we hand back to BossPay unchanged.
+ */
+export function toNineteenPayRef(clientTxnId: string): string {
+  return (clientTxnId || "").replace(/-/g, "").toLowerCase();
+}
+
+/** Inverse of toNineteenPayRef: 32 hex chars → canonical UUID with dashes. */
+export function fromNineteenPayRef(ref: string): string {
+  const r = (ref || "").replace(/-/g, "").toLowerCase();
+  if (r.length !== 32 || !/^[0-9a-f]+$/.test(r)) return ref;
+  return `${r.slice(0, 8)}-${r.slice(8, 12)}-${r.slice(12, 16)}-${r.slice(16, 20)}-${r.slice(20)}`;
+}
+
 export function signRequest(apiKey: string, salt: string, body: unknown) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomBytes(16).toString("hex");
@@ -64,7 +82,7 @@ export async function createNineteenPayCollect(
 
   const body: Record<string, unknown> = {
     amount: Number(params.amount),
-    collect_ref: params.collectRef,
+    collect_ref: toNineteenPayRef(params.collectRef),
     payer: { user_ref: rawRef },
   };
 
@@ -128,7 +146,8 @@ export async function queryNineteenPayStatus(
   config: NineteenPayConfig,
   collectRef: string,
 ): Promise<any> {
-  const body = { collect_ref_or: [collectRef] };
+  const ref = toNineteenPayRef(collectRef);
+  const body = { collect_ref_or: [ref] };
   const { signature, timestamp, nonce } = signRequest(
     config.apiKey,
     config.salt,
@@ -153,7 +172,7 @@ export async function queryNineteenPayStatus(
   // We need to return the details of the match.
   const transactions = data.data || [];
   const match = transactions.find(
-    (t: any) => t.collectRef === collectRef || t.collect_ref === collectRef,
+    (t: any) => t.collectRef === ref || t.collect_ref === ref,
   );
   if (!match) {
     throw new Error("Transaction not found in 19Pay status response");

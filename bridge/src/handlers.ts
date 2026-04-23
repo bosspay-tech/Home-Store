@@ -11,10 +11,6 @@ import { randomCustomerProfile } from './customer-pool.js';
 // In-memory store for pending payments is no longer heavily needed since 19Pay
 // directly gives us a checkoutUrl. Kept empty if needed for extending.
 
-function stripTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, '');
-}
-
 /**
  * Upsert `gateway_payload` on the bosspay_txns row.
  */
@@ -54,11 +50,9 @@ async function persistGatewayPayload(
 
 export function createNineteenPayHandlers(
   config: NineteenPayConfig,
-  bridgeBaseUrl: string,
+  _bridgeBaseUrl: string,
   supabase: SupabaseClient,
 ): BridgeHandlers {
-  const normalizedBridgeBaseUrl = stripTrailingSlash(bridgeBaseUrl);
-
   return {
     nineteenpay: {
       createCollection: async (req) => {
