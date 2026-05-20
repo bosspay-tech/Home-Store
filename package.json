@@ -9,6 +9,7 @@
     "build": "vite build && npm run build --prefix bridge",
     "start": "npm run start --prefix bridge",
     "dev:backend": "npm run dev --prefix bridge",
+    "seed:price-points": "node scripts/seed-home-store-price-points.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
