@@ -64,7 +64,7 @@ export default function Products() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [category]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();

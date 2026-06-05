@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination, Navigation } from "swiper/modules";
 
@@ -23,7 +23,6 @@ const COLLECTION_IMAGES = {
 };
 
 export default function Landing() {
-  const navigate = useNavigate()
   return (
     <div className="bg-white">
       <section className="relative">
@@ -44,9 +43,7 @@ export default function Landing() {
                   loading={idx === 0 ? "eager" : "lazy"}
                 />
 
-                {/* Overlay */}
                 <div className="absolute inset-0 flex items-end sm:items-center">
-                  {/* gradient for readability */}
                   <div className="absolute inset-0 bg-linear-to-t from-black/55 via-black/20 to-transparent sm:bg-linear-to-r sm:from-black/50 sm:via-black/10 sm:to-transparent" />
 
                   <div className="relative z-10 w-full p-5 sm:p-10">
@@ -61,15 +58,12 @@ export default function Landing() {
                         Fresh drops, great deals, fast delivery.
                       </p>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigate("/products"); 
-                        }}
+                      <Link
+                        to="/products"
                         className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-white/30"
                       >
-                        Shop Now <span className="text-base">→</span>
-                      </button>
+                        Shop now <span className="text-base">→</span>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -78,11 +72,9 @@ export default function Landing() {
           ))}
         </Swiper>
 
-        {/* subtle bottom fade so pagination stays visible */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/25 to-transparent" />
       </section>
 
-      {/* TRUST BAR */}
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto grid max-w-6xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-3">
           <TrustItem
@@ -98,12 +90,11 @@ export default function Landing() {
           <TrustItem
             title="Easy returns"
             desc="Simple return policy for peace of mind."
-            icon="↩️"
+            icon="↩"
           />
         </div>
       </section>
 
-      {/* FEATURED COLLECTIONS */}
       <section className="bg-linear-to-b from-slate-50 to-white">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -112,7 +103,7 @@ export default function Landing() {
                 Featured collections
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Pick a vibe. We’ll handle the rest.
+                Pick a collection and browse matching home-care essentials.
               </p>
             </div>
 
@@ -150,26 +141,20 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* MOVED: Previous Blue Hero Banner (kept as-is) */}
       <section className="relative overflow-hidden bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
-        {/* soft blobs */}
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 right-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24">
-          {/* Left */}
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/90">
-              🔥 New drops weekly • Fast checkout
+              New drops weekly · Fast checkout
             </span>
 
             <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">
-              Discover products you’ll actually love.
+              Discover products you will actually use.
             </h1>
 
             <p className="mt-4 max-w-xl text-base text-white/75">
-              Curated essentials, premium quality, and a smooth shopping
-              experience — from browse to delivery.
+              Curated home-care essentials, practical prices, and a smooth
+              shopping experience from browse to delivery.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -183,36 +168,46 @@ export default function Landing() {
 
             <div className="mt-8 flex flex-wrap gap-2 text-xs text-white/75">
               <span className="rounded-full bg-white/10 px-3 py-1">
-                🔒 Secure payments
+                Secure payments
               </span>
               <span className="rounded-full bg-white/10 px-3 py-1">
-                🚚 Fast shipping
+                Fast shipping
               </span>
               <span className="rounded-full bg-white/10 px-3 py-1">
-                ↩️ Easy returns
+                Easy returns
               </span>
             </div>
           </div>
 
-          {/* Right: product preview collage */}
-          <div className="relative">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <PreviewCard title="Best Sellers" subtitle="Top-rated picks" />
-              <PreviewCard title="New Arrivals" subtitle="Fresh drops" />
-              <PreviewCard
-                title="Premium Quality"
-                subtitle="Curated essentials"
-              />
-              <PreviewCard title="Fast Delivery" subtitle="Quick dispatch" />
-            </div>
-
-            <div className="pointer-events-none absolute -left-6 -top-6 h-20 w-20 rounded-2xl bg-white/10 blur-xl" />
-            <div className="pointer-events-none absolute -right-6 -bottom-6 h-28 w-28 rounded-2xl bg-white/10 blur-xl" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <PreviewCard
+              title="Best Sellers"
+              subtitle="Top-rated home-care picks"
+              imageUrl={COLLECTION_IMAGES.bestseller}
+              to="/products?category=bestseller"
+            />
+            <PreviewCard
+              title="New Arrivals"
+              subtitle="Fresh cleaning essentials"
+              imageUrl={COLLECTION_IMAGES["new-arrival"]}
+              to="/products?category=new-arrival"
+            />
+            <PreviewCard
+              title="Value Deals"
+              subtitle="Useful products at better prices"
+              imageUrl={COLLECTION_IMAGES["value-deal"]}
+              to="/products?category=value-deal"
+            />
+            <PreviewCard
+              title="All Products"
+              subtitle="Browse the full catalogue"
+              imageUrl={HERO_BANNERS[2]}
+              to="/products"
+            />
           </div>
         </div>
       </section>
 
-      {/* CTA */}
       <section className="bg-white">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-14 sm:px-6">
           <div className="rounded-2xl border border-slate-200 bg-slate-950 px-6 py-10 text-white sm:px-10">
@@ -241,13 +236,13 @@ export default function Landing() {
 
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/75">
               <span className="rounded-full bg-white/10 px-3 py-1">
-                ✅ Trusted
+                Trusted
               </span>
               <span className="rounded-full bg-white/10 px-3 py-1">
-                💳 UPI / Cards
+                UPI / Cards
               </span>
               <span className="rounded-full bg-white/10 px-3 py-1">
-                📦 Packed fast
+                Packed fast
               </span>
             </div>
           </div>
@@ -257,30 +252,36 @@ export default function Landing() {
   );
 }
 
-function PreviewCard({ title, subtitle }) {
+function PreviewCard({ title, subtitle, imageUrl, to }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/5 p-5 shadow-sm backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-1 text-xs text-white/70">{subtitle}</p>
+    <Link
+      to={to}
+      className="group overflow-hidden rounded-2xl border border-white/15 bg-white/5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-white/15"
+    >
+      <div className="relative h-32 overflow-hidden bg-white/10">
+        <img
+          src={imageUrl}
+          alt={title}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.src = HERO_BANNERS[0];
+          }}
+        />
+        <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
+      </div>
+
+      <div className="p-5">
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="mt-1 text-xs text-white/70">{subtitle}</p>
+        <div className="mt-5 flex items-center justify-between">
+          <span className="text-xs text-white/70">From ₹210</span>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
+            View
+          </span>
         </div>
-        <div className="h-10 w-10 rounded-xl bg-white/10" />
       </div>
-
-      <div className="mt-4 space-y-2">
-        <div className="h-3 w-full rounded bg-white/10" />
-        <div className="h-3 w-5/6 rounded bg-white/10" />
-        <div className="h-3 w-2/3 rounded bg-white/10" />
-      </div>
-
-      <div className="mt-5 flex items-center justify-between">
-        <span className="text-xs text-white/70">From ₹299</span>
-        <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
-          View
-        </span>
-      </div>
-    </div>
+    </Link>
   );
 }
 
@@ -320,7 +321,7 @@ function CollectionCard({ title, desc, tag, badge, imageUrl }) {
         <p className="mt-1 text-sm text-slate-600">{desc}</p>
 
         <Link
-          to={`/products/?category=${tag}`}
+          to={`/products?category=${tag}`}
           className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 hover:underline"
         >
           Shop collection <span aria-hidden>→</span>
