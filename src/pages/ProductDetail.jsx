@@ -137,10 +137,56 @@ function collectionLabelFromKey(key) {
   return labels[key] || formatAttributeKey(key || "Essentials");
 }
 
+function normalizeCategoryKey(value) {
+  const key = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+
+  const aliases = {
+    "best-seller": "bestseller",
+    "best-sellers": "bestseller",
+    "new-arrivals": "new-arrival",
+    "value-deals": "value-deal",
+  };
+
+  return aliases[key] || key;
+}
+
+function productCategoryKeys(product) {
+  const rawCategories = Array.isArray(product?.categories)
+    ? product.categories
+    : product?.categories
+      ? [product.categories]
+      : [];
+
+  return rawCategories.map(normalizeCategoryKey).filter(Boolean);
+}
+
 function featuredCollectionKeys(product) {
   const featured = ["value-deal", "bestseller", "new-arrival"];
-  const categories = Array.isArray(product?.categories) ? product.categories : [];
+  const categories = productCategoryKeys(product);
   return featured.filter((key) => categories.includes(key));
+}
+
+function chooseRelatedProducts(product, products) {
+  const currentCollections = featuredCollectionKeys(product);
+  const candidates = products.filter((item) => item.id !== product.id);
+  const sameCollection = candidates.filter((item) => {
+    const itemCollections = featuredCollectionKeys(item);
+    return currentCollections.some((key) => itemCollections.includes(key));
+  });
+
+  if (sameCollection.length) {
+    return { items: sameCollection.slice(0, 8), source: "collection" };
+  }
+
+  const sameType = candidates.filter((item) => item.type === product.type);
+  if (sameType.length) {
+    return { items: sameType.slice(0, 8), source: "type" };
+  }
+
+  return { items: candidates.slice(0, 8), source: "all" };
 }
 
 function SpecificationsList({ product, typeLabel, collectionLabel, attributes }) {
@@ -231,6 +277,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [related, setRelated] = useState([]);
+  const [relatedSource, setRelatedSource] = useState("collection");
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [pincode, setPincode] = useState("");
   const [pinMsg, setPinMsg] = useState("");
@@ -278,8 +325,7 @@ export default function ProductDetail() {
     const fetchRelated = async () => {
       setRelatedLoading(true);
 
-      const collectionKeys = featuredCollectionKeys(product);
-      let query = supabase
+      const { data, error } = await supabase
         .from("products")
         .select(
           "id,title,base_price,mrp,image_url,description,is_active,categories,type",
@@ -287,19 +333,20 @@ export default function ProductDetail() {
         .eq("store_id", STORE_ID)
         .eq("is_active", true)
         .neq("id", product.id)
-        .limit(8);
-
-      if (collectionKeys.length) {
-        query = query.overlaps("categories", collectionKeys);
-      } else if (product?.type) {
-        query = query.eq("type", product.type);
-      }
-
-      const { data, error } = await query;
+        .order("created_at", { ascending: false })
+        .limit(60);
 
       if (!alive) return;
 
-      setRelated(!error && Array.isArray(data) ? data : []);
+      if (!error && Array.isArray(data)) {
+        const result = chooseRelatedProducts(product, data);
+        setRelated(result.items);
+        setRelatedSource(result.source);
+      } else {
+        setRelated([]);
+        setRelatedSource("all");
+      }
+
       setRelatedLoading(false);
     };
 
@@ -331,9 +378,15 @@ export default function ProductDetail() {
     collectionLabelFromKey(product?.category || product?.categories?.[0]);
   const attributeEntries = getAttributeEntries(product?.attributes);
   const relatedHeading =
-    currentCollectionKeys.length > 0
+    relatedSource === "collection" && currentCollectionKeys.length > 0
       ? `More from ${collectionLabel}`
-      : `More ${typeLabel} products`;
+      : relatedSource === "type"
+        ? `More ${typeLabel} products`
+        : "More products you may like";
+  const relatedCopy =
+    relatedSource === "collection"
+      ? "Pick another product from the same featured collection."
+      : "A few more useful products from this store.";
 
   const handleAddToCart = () => {
     if (!inStock) return;
@@ -681,9 +734,7 @@ export default function ProductDetail() {
               <h2 className="text-lg font-bold text-slate-900">
                 {relatedHeading}
               </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Pick another product from the same featured collection.
-              </p>
+              <p className="mt-1 text-sm text-slate-600">{relatedCopy}</p>
             </div>
             <Link
               to={
