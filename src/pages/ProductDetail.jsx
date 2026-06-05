@@ -328,7 +328,7 @@ export default function ProductDetail() {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id,title,base_price,mrp,image_url,description,is_active,categories,type",
+          "id,title,base_price,image_url,description,is_active,categories,type",
         )
         .eq("store_id", STORE_ID)
         .eq("is_active", true)
