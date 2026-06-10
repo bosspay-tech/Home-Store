@@ -37,6 +37,13 @@ export default function Products() {
       setLoading(true);
       setErr("");
 
+      if (!supabase) {
+        setErr("Supabase is not configured. Add VITE_SUPABASE_* to .env and restart.");
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
       let query = supabase
         .from("products")
         .select("*")

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "postinstall": "npm install --prefix bridge",
+    "postinstall": "node scripts/install-bridge.mjs",
     "build": "vite build && npm run build --prefix bridge",
     "start": "npm run start --prefix bridge",
     "dev:backend": "npm run dev --prefix bridge",

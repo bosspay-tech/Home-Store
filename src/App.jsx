@@ -18,10 +18,18 @@ import ReturnsRefundsPolicy from "./pages/ReturnsRefundsPolicy";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ContactPage from "./pages/ContactPage";
+import { isSupabaseConfigured } from "./lib/supabase";
+
 const App = () => {
   return (
     <Router>
       <Toaster position="top-right" />
+      {!isSupabaseConfigured ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-950">
+          Supabase is not configured. Copy <code>.env.example</code> to{" "}
+          <code>.env</code>, add your keys, then restart the dev server.
+        </div>
+      ) : null}
       <Navbar />
       <ScrollToTop />
       <Routes>

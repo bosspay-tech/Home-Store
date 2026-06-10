@@ -31,12 +31,26 @@ export default function OrderSuccess() {
         const collectRef =
           searchParams.get("collect_ref") ||
           searchParams.get("collectRef") ||
+          searchParams.get("txnid") ||
           searchParams.get("order_id") ||
+          sessionStorage.getItem("payment_collect_ref") ||
           "";
+
+        const gateway =
+          searchParams.get("gateway") ||
+          sessionStorage.getItem("payment_gateway") ||
+          "nineteenpay";
 
         if (!collectRef) {
           setMessage("No payment reference found in the URL.");
           setStatus("failed");
+          return;
+        }
+
+        if (searchParams.get("status") === "failed") {
+          setTxnId(collectRef);
+          setStatus("failed");
+          setMessage("Payment was not completed.");
           return;
         }
 
@@ -54,6 +68,8 @@ export default function OrderSuccess() {
 
           if (order.status === "success") {
             clearCart();
+            sessionStorage.removeItem("payment_gateway");
+            sessionStorage.removeItem("payment_collect_ref");
             setStatus("success");
             return;
           }
@@ -63,8 +79,12 @@ export default function OrderSuccess() {
           }
         }
 
-        // If still pending, poll the 19Pay status API
-        const response = await fetch("/api/payment-status", {
+        const statusEndpoint =
+          gateway === "easebuzz"
+            ? "/api/easebuzz/payment-status"
+            : "/api/nineteenpay/payment-status";
+
+        const response = await fetch(statusEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ collect_refs: [collectRef] }),
@@ -76,20 +96,27 @@ export default function OrderSuccess() {
           const payment = result.data[0];
           const paymentStatus = (payment.status || "").toUpperCase();
 
-          if (paymentStatus === "SUCCESS" || paymentStatus === "CAPTURED") {
+          if (
+            paymentStatus === "SUCCESS" ||
+            paymentStatus === "CAPTURED"
+          ) {
             await supabase
               .from("orders")
               .update({ status: "success" })
               .eq("transaction_id", collectRef);
             clearCart();
+            sessionStorage.removeItem("payment_gateway");
+            sessionStorage.removeItem("payment_collect_ref");
             setStatus("success");
             return;
           }
 
           if (
             paymentStatus === "FAILED" ||
+            paymentStatus === "FAILURE" ||
             paymentStatus === "DECLINED" ||
-            paymentStatus === "CANCELLED"
+            paymentStatus === "CANCELLED" ||
+            paymentStatus === "USERCANCELLED"
           ) {
             await supabase
               .from("orders")

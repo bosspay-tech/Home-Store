@@ -1,3 +1,4 @@
+import "./env.js";
 import express, { type Request, type Response } from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -10,8 +11,6 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { createNineteenPayHandlers } from "./handlers.js";
 import {
-  createNineteenPayCollect,
-  queryNineteenPayStatus,
   verifyNineteenPayWebhook,
   resolveNineteenPayStatus,
   signRequest,
@@ -21,6 +20,12 @@ import {
   type NineteenPayConfig,
 } from "./nineteenpay.js";
 import { startNineteenPayReconciler } from "./reconciler.js";
+import {
+  initiateEasebuzzPayment,
+  retrieveEasebuzzTransaction,
+  normalizeEasebuzzStatusResponse,
+  type EasebuzzConfig,
+} from "./easebuzz.js";
 
 // ── Environment ────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3000);
@@ -34,6 +39,29 @@ const NP_KEY = process.env.NP_KEY;
 const NP_SALT = process.env.NP_SALT;
 const NP_WEBHOOK_SECRET = process.env.NP_WEBHOOK_SECRET;
 const NP_API_BASE = process.env.NP_API_BASE ?? "https://nineteenapis.online";
+
+const EASEBUZZ_KEY = process.env.EASEBUZZ_KEY;
+const EASEBUZZ_SALT = process.env.EASEBUZZ_SALT;
+const EASEBUZZ_URL =
+  process.env.EASEBUZZ_URL ?? "https://pay.easebuzz.in";
+const EASEBUZZ_STATUS_URL =
+  process.env.EASEBUZZ_STATUS_URL ??
+  "https://dashboard.easebuzz.in/transaction/v2.1/retrieve";
+const STOREFRONT_URL =
+  process.env.STOREFRONT_URL ?? "http://localhost:5173";
+const BRIDGE_PUBLIC_URL = (
+  process.env.BRIDGE_PUBLIC_URL ?? `http://localhost:${PORT}`
+).replace(/\/+$/, "");
+
+const easebuzzConfig: EasebuzzConfig | null =
+  EASEBUZZ_KEY && EASEBUZZ_SALT
+    ? {
+        key: EASEBUZZ_KEY,
+        salt: EASEBUZZ_SALT,
+        payBaseUrl: EASEBUZZ_URL,
+        statusUrl: EASEBUZZ_STATUS_URL,
+      }
+    : null;
 
 // ── Validate required env vars exist ───────────────────────────────
 const missing = (
@@ -371,8 +399,11 @@ app.use((req, res, next) => {
     req.path.includes("/webhooks/nineteenpay");
 
   const isBridgeRoute = req.path.includes("/bosspay/v1/");
+  const isEasebuzzReturn = req.path === "/api/easebuzz/return";
 
-  if (isNineteenPayCallback || isBridgeRoute) {
+  if (isEasebuzzReturn) {
+    express.urlencoded({ extended: true, limit: "1mb" })(req, res, next);
+  } else if (isNineteenPayCallback || isBridgeRoute) {
     // bridge-node needs raw bytes for HMAC; putting express.json() in front
     // hangs readRawBody forever (stream already consumed), which manifests
     // upstream as a Headers Timeout Error after ~8s.
@@ -425,145 +456,315 @@ app.post("/wp-json/bosspay/v1/callback/nineteenpay/:txnId", async (req, res) =>
 
 // ── Legacy Home-Store API routes (Frontend compatibility) ──
 
-app.post("/api/create-payment", async (req, res) => {
+async function handleEasebuzzCreatePayment(req: Request, res: Response) {
+  if (!easebuzzConfig) {
+    res.status(503).json({
+      success: false,
+      error: "Easebuzz is not configured (EASEBUZZ_KEY, EASEBUZZ_SALT)",
+    });
+    return;
+  }
+
+  const {
+    amount,
+    collect_ref,
+    display_name,
+    txn_note,
+    user_ref,
+    email,
+    phone,
+    productinfo,
+    surl,
+    furl,
+    address1,
+    city,
+    state,
+    country,
+    zipcode,
+  } = req.body ?? {};
+
+  if (!amount || Number(amount) <= 0) {
+    res.status(400).json({ success: false, error: "Invalid amount" });
+    return;
+  }
+
+  const txnid = String(collect_ref || `ORD${Date.now()}`);
+  const firstname = String(display_name || "Customer").trim();
+  const customerEmail = String(email || "").trim();
+  const customerPhone = String(phone || user_ref || "").trim();
+
+  if (!customerEmail) {
+    res.status(400).json({ success: false, error: "Customer email is required" });
+    return;
+  }
+  if (!customerPhone) {
+    res.status(400).json({ success: false, error: "Customer phone is required" });
+    return;
+  }
+
+  // Easebuzz POSTs form data to surl/furl — must hit the bridge, not the Vite SPA.
+  const successUrl = surl || `${BRIDGE_PUBLIC_URL}/api/easebuzz/return?outcome=success`;
+  const failureUrl = furl || `${BRIDGE_PUBLIC_URL}/api/easebuzz/return?outcome=failed`;
+
+  const result = await initiateEasebuzzPayment(easebuzzConfig, {
+    txnid,
+    amount: Number(amount),
+    productinfo: productinfo || txn_note || `Order ${txnid}`,
+    firstname,
+    email: customerEmail,
+    phone: customerPhone,
+    surl: successUrl,
+    furl: failureUrl,
+    udf1: txnid,
+    address1: address1 || undefined,
+    city: city || undefined,
+    state: state || undefined,
+    country: country || "India",
+    zipcode: zipcode || undefined,
+  });
+
+  res.json({
+    success: true,
+    checkoutUrl: result.checkoutUrl,
+    transactionId: result.accessKey,
+    collectRef: result.txnid,
+  });
+}
+
+async function handleEasebuzzPaymentStatus(req: Request, res: Response) {
+  if (!easebuzzConfig) {
+    res.status(503).json({
+      success: false,
+      error: "Easebuzz is not configured (EASEBUZZ_KEY, EASEBUZZ_SALT)",
+    });
+    return;
+  }
+
+  const { collect_refs, txnid } = req.body ?? {};
+  const refs = Array.isArray(collect_refs)
+    ? collect_refs
+    : txnid
+      ? [txnid]
+      : [];
+
+  if (!refs.length) {
+    res.status(400).json({
+      success: false,
+      error: "collect_refs array or txnid is required",
+    });
+    return;
+  }
+
+  const primaryTxnId = String(refs[0]);
+  const result = await retrieveEasebuzzTransaction(easebuzzConfig, primaryTxnId);
+  const normalized = normalizeEasebuzzStatusResponse(result, primaryTxnId);
+
+  res.status(normalized.success ? 200 : 404).json(normalized);
+}
+
+app.post("/api/easebuzz/create-payment", async (req, res) => {
   try {
-    const {
-      amount,
-      collect_ref,
-      display_name,
-      txn_note,
-      idempotency_key,
-      user_ref,
-    } = req.body;
+    await handleEasebuzzCreatePayment(req, res);
+  } catch (err) {
+    console.error("easebuzz create-payment error:", err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : "Internal server error",
+    });
+  }
+});
 
-    if (!amount || amount <= 0) {
-      res.status(400).json({ success: false, error: "Invalid amount" });
-      return;
-    }
+app.post("/api/easebuzz/payment-status", async (req, res) => {
+  try {
+    await handleEasebuzzPaymentStatus(req, res);
+  } catch (err) {
+    console.error("easebuzz payment-status error:", err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : "Internal server error",
+    });
+  }
+});
 
-    const body: any = { amount: Number(amount) };
-    if (collect_ref) body.collect_ref = toNineteenPayRef(collect_ref);
-    if (display_name) body.display_name = display_name;
-    if (txn_note) body.txn_note = txn_note;
+async function handleNineteenPayCreatePayment(req: Request, res: Response) {
+  const {
+    amount,
+    collect_ref,
+    display_name,
+    txn_note,
+    idempotency_key,
+    user_ref,
+  } = req.body ?? {};
 
-    let rawRef = (user_ref || "").replace(/[^a-zA-Z0-9]/g, "");
-    if (rawRef.length < 5) {
-      rawRef = (collect_ref || "").replace(/[^a-zA-Z0-9]/g, "");
-    }
-    if (rawRef.length < 5) {
-      rawRef = "guestuser";
-    }
-    body.payer = { user_ref: rawRef };
+  if (!amount || Number(amount) <= 0) {
+    res.status(400).json({ success: false, error: "Invalid amount" });
+    return;
+  }
 
-    const { signature, timestamp, nonce } = signRequest(
-      nineteenPayConfig.apiKey,
-      nineteenPayConfig.salt,
-      body,
-    );
-    const headers = buildHeaders(
-      nineteenPayConfig.apiKey,
-      timestamp,
-      nonce,
-      signature,
-      idempotency_key,
-    );
+  const body: Record<string, unknown> = { amount: Number(amount) };
+  if (collect_ref) body.collect_ref = toNineteenPayRef(String(collect_ref));
+  if (display_name) body.display_name = display_name;
+  if (txn_note) body.txn_note = txn_note;
 
-    const url = `${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/collect`;
-    const response = await fetch(url, {
+  let rawRef = String(user_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+  if (rawRef.length < 5) {
+    rawRef = String(collect_ref || "").replace(/[^a-zA-Z0-9]/g, "");
+  }
+  if (rawRef.length < 5) {
+    rawRef = "guestuser";
+  }
+  body.payer = { user_ref: rawRef };
+
+  const { signature, timestamp, nonce } = signRequest(
+    nineteenPayConfig.apiKey,
+    nineteenPayConfig.salt,
+    body,
+  );
+  const headers = buildHeaders(
+    nineteenPayConfig.apiKey,
+    timestamp,
+    nonce,
+    signature,
+    idempotency_key,
+  );
+
+  const url = `${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/collect`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
+  let data: Record<string, any>;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    data = { message: responseText };
+  }
+
+  if (!response.ok || !data.success) {
+    res.status(response.status).json({
+      success: false,
+      error: data.message || data.raw?.error || "Payment creation failed",
+    });
+    return;
+  }
+
+  if (data.raw?.error) {
+    res.status(400).json({ success: false, error: data.raw.error });
+    return;
+  }
+
+  const checkoutUrl = data.link || data.checkoutUrl;
+  if (!checkoutUrl) {
+    res.status(502).json({
+      success: false,
+      error: "No checkout URL returned from payment gateway",
+    });
+    return;
+  }
+
+  res.json({
+    success: true,
+    checkoutUrl,
+    transactionId: data.transactionId,
+    collectRef: data.collectRef ?? collect_ref,
+    gateway: "nineteenpay",
+  });
+}
+
+async function handleNineteenPayPaymentStatus(req: Request, res: Response) {
+  const { collect_refs } = req.body ?? {};
+
+  if (!collect_refs || !Array.isArray(collect_refs) || !collect_refs.length) {
+    res
+      .status(400)
+      .json({ success: false, error: "collect_refs array required" });
+    return;
+  }
+
+  const body = {
+    collect_ref_or: (collect_refs as string[]).map((r) => toNineteenPayRef(r)),
+  };
+  const { signature, timestamp, nonce } = signRequest(
+    nineteenPayConfig.apiKey,
+    nineteenPayConfig.salt,
+    body,
+  );
+  const headers = buildHeaders(
+    nineteenPayConfig.apiKey,
+    timestamp,
+    nonce,
+    signature,
+  );
+
+  const response = await fetch(
+    `${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/status`,
+    {
       method: "POST",
       headers,
       body: JSON.stringify(body),
-    });
+    },
+  );
 
-    const responseText = await response.text();
+  const data = await response.json();
+  res.status(response.status).json(data);
+}
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      data = { message: responseText };
-    }
+function handleEasebuzzReturn(req: Request, res: Response) {
+  const body = (req.body ?? {}) as Record<string, string>;
+  const query = req.query as Record<string, string>;
+  const txnid =
+    body.txnid || body.udf1 || query.txnid || query.collect_ref || "";
+  const pgStatus = (body.status || "").toLowerCase();
+  const failed =
+    query.outcome === "failed" ||
+    pgStatus === "failure" ||
+    pgStatus === "failed" ||
+    pgStatus === "usercancelled";
 
-    if (!response.ok || !data.success) {
-      res.status(response.status).json({
-        success: false,
-        error: data.message || data.raw?.error || "Payment creation failed",
-      });
-      return;
-    }
-
-    if (data.raw?.error) {
-      res.status(400).json({
-        success: false,
-        error: data.raw.error,
-      });
-      return;
-    }
-
-    const checkoutUrl = data.link || data.checkoutUrl;
-
-    if (!checkoutUrl) {
-      res.status(502).json({
-        success: false,
-        error: "No checkout URL returned from payment gateway",
-      });
-      return;
-    }
-
-    res.json({
-      success: true,
-      checkoutUrl,
-      transactionId: data.transactionId,
-      collectRef: data.collectRef,
-    });
-  } catch (err) {
-    console.error("create-payment error:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
+  const params = new URLSearchParams({
+    gateway: "easebuzz",
+  });
+  if (txnid) {
+    params.set("collect_ref", txnid);
+    params.set("txnid", txnid);
   }
-});
+  if (failed) {
+    params.set("status", "failed");
+  }
 
-app.post("/api/payment-status", async (req, res) => {
+  const redirectUrl = `${STOREFRONT_URL.replace(/\/+$/, "")}/order-success?${params}`;
+  res.redirect(302, redirectUrl);
+}
+
+app.post("/api/nineteenpay/create-payment", async (req, res) => {
   try {
-    const { collect_refs } = req.body;
-
-    if (!collect_refs || !Array.isArray(collect_refs) || !collect_refs.length) {
-      res
-        .status(400)
-        .json({ success: false, error: "collect_refs array required" });
-      return;
-    }
-
-    const body = {
-      collect_ref_or: (collect_refs as string[]).map((r) => toNineteenPayRef(r)),
-    };
-    const { signature, timestamp, nonce } = signRequest(
-      nineteenPayConfig.apiKey,
-      nineteenPayConfig.salt,
-      body,
-    );
-    const headers = buildHeaders(
-      nineteenPayConfig.apiKey,
-      timestamp,
-      nonce,
-      signature,
-    );
-
-    const response = await fetch(
-      `${nineteenPayConfig.apiBase}/api/v2/payments/nsdl/status`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      },
-    );
-
-    const data = await response.json();
-    res.status(response.status).json(data);
+    await handleNineteenPayCreatePayment(req, res);
   } catch (err) {
-    console.error("payment-status error:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
+    console.error("nineteenpay create-payment error:", err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : "Internal server error",
+    });
   }
 });
+
+app.post("/api/nineteenpay/payment-status", async (req, res) => {
+  try {
+    await handleNineteenPayPaymentStatus(req, res);
+  } catch (err) {
+    console.error("nineteenpay payment-status error:", err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : "Internal server error",
+    });
+  }
+});
+
+app.post("/api/easebuzz/return", handleEasebuzzReturn);
+app.get("/api/easebuzz/return", handleEasebuzzReturn);
 
 // ── Serve storefront equivalent directly if running within HomeStore ──
 // If the bridge is replacing server.js entirely, you can serve dist here:

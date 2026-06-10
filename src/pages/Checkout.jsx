@@ -5,6 +5,7 @@ import { useCartStore } from "../store/cart.store";
 import { STORE_ID } from "../config/store";
 import { useAuth } from "../features/auth/useAuth";
 import CheckoutDetailsModal from "../components/CheckoutDetailsModal";
+import PaymentMethodModal from "../components/PaymentMethodModal";
 
 function formatMoney(n) {
   const num = Number(n || 0);
@@ -16,6 +17,9 @@ export default function Checkout() {
   const { user } = useAuth();
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingCustomer, setPendingCustomer] = useState(null);
+  const [pendingCollectRef, setPendingCollectRef] = useState("");
   const [upiUrl, setUpiUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,21 +58,52 @@ export default function Checkout() {
       setLoading(true);
 
       const collectRef = "ORD" + Date.now();
-
-      // 1. Create order in Supabase with pending status
       await createOrder(collectRef, customer);
 
-      // 2. Call our server to create 19Pay collect
-      const response = await fetch("/api/create-payment", {
+      setPendingCustomer(customer);
+      setPendingCollectRef(collectRef);
+      setShowCheckoutModal(false);
+      setShowPaymentModal(true);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
+      setLoading(false);
+      setShowCheckoutModal(false);
+    }
+  };
+
+  const handlePaymentMethodSelect = async (gateway) => {
+    if (!pendingCustomer || !pendingCollectRef) return;
+
+    try {
+      setError("");
+      setLoading(true);
+
+      const customer = pendingCustomer;
+      const collectRef = pendingCollectRef;
+      const endpoint =
+        gateway === "easebuzz"
+          ? "/api/easebuzz/create-payment"
+          : "/api/nineteenpay/create-payment";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: subtotal,
           collect_ref: collectRef,
           display_name: customer.name,
-          txn_note: `Order ${collectRef}`,
-          idempotency_key: collectRef,
+          email: customer.email,
+          phone: customer.phone,
           user_ref: customer.phone,
+          txn_note: `Order ${collectRef}`,
+          productinfo: `Home Store order ${collectRef}`,
+          idempotency_key: collectRef,
+          address1: customer.address,
+          city: customer.city,
+          state: customer.state,
+          zipcode: customer.pincode,
+          country: "India",
         }),
       });
 
@@ -78,18 +113,20 @@ export default function Checkout() {
         throw new Error(data.error || "Failed to create payment");
       }
 
-      // 3. Render UPI QR modal or redirect
+      sessionStorage.setItem("payment_gateway", gateway);
+      sessionStorage.setItem("payment_collect_ref", collectRef);
+
       if (data.checkoutUrl.startsWith("upi://")) {
         setUpiUrl(data.checkoutUrl);
         setLoading(false);
-        setShowCheckoutModal(false);
+        setShowPaymentModal(false);
       } else {
         window.location.href = data.checkoutUrl;
       }
     } catch (err) {
       setError(err.message || "Something went wrong.");
       setLoading(false);
-      setShowCheckoutModal(false);
+      setShowPaymentModal(false);
     }
   };
 
@@ -304,6 +341,20 @@ export default function Checkout() {
         loading={loading}
         amount={subtotal}
         user={user}
+      />
+
+      <PaymentMethodModal
+        open={showPaymentModal}
+        onClose={() => {
+          if (!loading) {
+            setShowPaymentModal(false);
+            setShowCheckoutModal(true);
+          }
+        }}
+        onSelect={handlePaymentMethodSelect}
+        loading={loading}
+        amount={subtotal}
+        customerName={pendingCustomer?.name || ""}
       />
       {upiUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[2px]">

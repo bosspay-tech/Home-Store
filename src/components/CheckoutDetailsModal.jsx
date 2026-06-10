@@ -267,7 +267,7 @@ export default function CheckoutDetailsModal({
                 disabled={loading}
                 className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {loading ? "Redirecting..." : "Proceed to Payment"}
+                {loading ? "Please wait..." : "Continue"}
               </button>
             </div>
           </div>
