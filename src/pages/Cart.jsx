@@ -1,5 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import { useCartStore } from "../store/cart.store";
+import { normalizeHttpsUrl } from "../components/ProductCard";
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=70";
 
 function formatMoney(n) {
   const num = Number(n || 0);
@@ -8,6 +14,46 @@ function formatMoney(n) {
 
 export default function Cart() {
   const { items, removeItem, updateQty, total } = useCartStore();
+  const [hydratedImages, setHydratedImages] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    const missingIds = [
+      ...new Set(
+        items
+          .filter((item) => item.productId && !normalizeHttpsUrl(item.imageUrl))
+          .map((item) => item.productId),
+      ),
+    ];
+
+    if (!missingIds.length || !supabase) return undefined;
+
+    supabase
+      .from("products")
+      .select("id, image_url")
+      .in("id", missingIds)
+      .then(({ data }) => {
+        if (!alive || !data?.length) return;
+        setHydratedImages((prev) => ({
+          ...prev,
+          ...Object.fromEntries(
+            data.map((product) => [
+              product.id,
+              normalizeHttpsUrl(product.image_url),
+            ]),
+          ),
+        }));
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [items]);
+
+  const itemImage = (item) =>
+    normalizeHttpsUrl(item.imageUrl) ||
+    hydratedImages[item.productId] ||
+    FALLBACK_IMAGE;
 
   // Empty state
   if (!items?.length) {
@@ -83,14 +129,46 @@ export default function Cart() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     {/* Left: Image placeholder + details */}
                     <div className="flex items-start gap-4">
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                        Img
-                      </div>
+                      {item.productId ? (
+                        <Link
+                          to={`/products/${item.productId}`}
+                          className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                        >
+                          <img
+                            src={itemImage(item)}
+                            alt={item.title || "Product"}
+                            className="h-full w-full object-contain p-2"
+                            onError={(event) => {
+                              event.currentTarget.src = FALLBACK_IMAGE;
+                            }}
+                          />
+                        </Link>
+                      ) : (
+                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                          <img
+                            src={itemImage(item)}
+                            alt={item.title || "Product"}
+                            className="h-full w-full object-contain p-2"
+                            onError={(event) => {
+                              event.currentTarget.src = FALLBACK_IMAGE;
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900">
-                          {item.title}
-                        </p>
+                        {item.productId ? (
+                          <Link
+                            to={`/products/${item.productId}`}
+                            className="truncate text-sm font-semibold text-slate-900 hover:underline"
+                          >
+                            {item.title}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {item.title}
+                          </p>
+                        )}
 
                         {item.variantLabel ? (
                           <p className="mt-1 text-xs text-slate-500">

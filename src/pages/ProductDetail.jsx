@@ -396,6 +396,7 @@ export default function ProductDetail() {
       storeId: STORE_ID,
       title: product.title,
       price,
+      imageUrl: normalizeHttpsUrl(product.image_url),
     });
 
     toast.success(
