@@ -171,14 +171,14 @@ export default function Landing() {
         </div>
       </div>
 
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden leading-none">
         <Swiper
           modules={[Autoplay, Pagination]}
           loop
           autoHeight
           autoplay={{ delay: 5000, disableOnInteraction: false }}
           pagination={{ clickable: true }}
-          className="landing-swiper h-[min(68vh,720px)] min-h-[420px] w-full"
+          className="landing-swiper w-full md:h-[min(68vh,720px)] md:min-h-[420px]"
         >
           {HERO_SLIDES.map((slide) => (
             <SwiperSlide key={slide.title}>
@@ -196,18 +196,20 @@ export default function Landing() {
       </section>
 
       <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-6xl gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-slate-200 lg:grid-cols-4">
           {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
             <div
               key={title}
-              className="flex items-start gap-3 bg-white px-5 py-6 sm:px-6"
+              className="flex items-start gap-2.5 bg-white px-3 py-4 sm:gap-3 sm:px-6 sm:py-6"
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                <Icon className="h-5 w-5" aria-hidden="true" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-11 sm:w-11 sm:rounded-2xl">
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{title}</p>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500">{desc}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-900 sm:text-sm">{title}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">
+                  {desc}
+                </p>
               </div>
             </div>
           ))}

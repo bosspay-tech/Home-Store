@@ -10,11 +10,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.landing-swiper .swiper-wrapper {
+  align-items: flex-start;
+}
+
+.landing-swiper .swiper-slide {
+  height: auto;
+}
+
 .landing-swiper .swiper-pagination {
-  bottom: 1rem !important;
+  bottom: 0.5rem !important;
   left: 0 !important;
   width: 100% !important;
   text-align: center;
+}
+
+@media (min-width: 768px) {
+  .landing-swiper .swiper-pagination {
+    bottom: 1rem !important;
+  }
 }
 
 .landing-swiper .swiper-pagination-bullet {
