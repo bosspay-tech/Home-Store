@@ -3,7 +3,7 @@
 NIXPACKS_NODE_VERSION = "22"
 
 [phases.install]
-cmds = ["npm ci --include=dev"]
+cmds = ["npm ci --include=dev --include=optional"]
 
 [phases.build]
 cmds = ["npm run build"]

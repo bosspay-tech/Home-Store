@@ -8,7 +8,7 @@ COPY scripts/install-bridge.mjs ./scripts/
 COPY bridge/package.json bridge/package-lock.json ./bridge/
 COPY bridge/vendor ./bridge/vendor/
 
-RUN npm ci --include=dev
+RUN npm ci --include=dev --include=optional
 
 COPY . .
 
