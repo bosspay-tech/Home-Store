@@ -11,7 +11,10 @@ body {
 }
 
 .landing-swiper .swiper-pagination {
-  bottom: 1.5rem !important;
+  bottom: 1rem !important;
+  left: 0 !important;
+  width: 100% !important;
+  text-align: center;
 }
 
 .landing-swiper .swiper-pagination-bullet {

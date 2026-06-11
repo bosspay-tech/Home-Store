@@ -175,52 +175,21 @@ export default function Landing() {
         <Swiper
           modules={[Autoplay, Pagination]}
           loop
+          autoHeight
           autoplay={{ delay: 5000, disableOnInteraction: false }}
           pagination={{ clickable: true }}
           className="landing-swiper h-[min(68vh,720px)] min-h-[420px] w-full"
         >
           {HERO_SLIDES.map((slide) => (
             <SwiperSlide key={slide.title}>
-              <div className="relative h-full w-full">
+              <Link to={slide.to} className="block w-full">
                 <img
                   src={slide.image}
-                  alt=""
-                  className="h-full w-full object-cover"
+                  alt={slide.title}
+                  className="block h-auto w-full"
                   loading="eager"
                 />
-                <div className="absolute inset-0 bg-linear-to-r from-slate-950/80 via-slate-950/45 to-slate-950/10" />
-
-                <div className="absolute inset-0 flex items-center">
-                  <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-                    <div className="max-w-xl">
-                      <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/95 uppercase backdrop-blur-sm">
-                        {slide.eyebrow}
-                      </span>
-                      <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]">
-                        {slide.title}
-                      </h1>
-                      <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/85 sm:text-base">
-                        {slide.subtitle}
-                      </p>
-                      <div className="mt-7 flex flex-wrap gap-3">
-                        <Link
-                          to={slide.to}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-white/30"
-                        >
-                          {slide.cta}
-                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                        </Link>
-                        <Link
-                          to="/cart"
-                          className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-white/20"
-                        >
-                          View cart
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </Link>
             </SwiperSlide>
           ))}
         </Swiper>

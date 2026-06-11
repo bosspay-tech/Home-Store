@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { lookupPincode } from "../lib/pincode";
 
 function formatMoney(n) {
   const num = Number(n || 0);
@@ -15,6 +16,12 @@ const emptyCustomer = {
   pincode: "",
 };
 
+const MIN_ADDRESS_WORDS = 8;
+
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 export default function CheckoutDetailsModal({
   open,
   onClose,
@@ -27,21 +34,26 @@ export default function CheckoutDetailsModal({
 }) {
   const [customer, setCustomer] = useState(emptyCustomer);
   const [error, setError] = useState("");
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [pincodeHint, setPincodeHint] = useState("");
+  const lastLookupRef = useRef("");
 
   useEffect(() => {
     if (!open) return;
 
     setCustomer({
-      name:  "",
-      email:  user?.email || "",
-      phone:  "",
-      address:  "",
-      city:  "",
-      state:  "",
-      pincode:  "",
+      name: "",
+      email: user?.email || "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
     });
 
     setError("");
+    setPincodeHint("");
+    lastLookupRef.current = "";
   }, [open, user]);
 
   useEffect(() => {
@@ -62,8 +74,77 @@ export default function CheckoutDetailsModal({
     };
   }, [open, loading, onClose]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const pincode = customer.pincode.replace(/\D/g, "");
+    if (pincode.length !== 6) {
+      setPincodeLoading(false);
+      if (pincode.length < 6) {
+        setPincodeHint("");
+        lastLookupRef.current = "";
+      }
+      return undefined;
+    }
+
+    if (lastLookupRef.current === pincode) return undefined;
+
+    let alive = true;
+    const timer = setTimeout(async () => {
+      setPincodeLoading(true);
+      setPincodeHint("");
+
+      try {
+        const result = await lookupPincode(pincode);
+        if (!alive) return;
+
+        lastLookupRef.current = pincode;
+
+        if (!result) {
+          setPincodeHint("Pincode not found. Enter city and state manually.");
+          return;
+        }
+
+        setCustomer((prev) => ({
+          ...prev,
+          city: result.city,
+          state: result.state,
+        }));
+        setPincodeHint("City and state filled from pincode.");
+      } catch {
+        if (!alive) return;
+        setPincodeHint("Could not fetch location. Enter city and state manually.");
+      } finally {
+        if (alive) setPincodeLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [customer.pincode, open]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "pincode") {
+      const digits = value.replace(/\D/g, "").slice(0, 6);
+      setCustomer((prev) => ({
+        ...prev,
+        pincode: digits,
+      }));
+      return;
+    }
+
+    if (name === "phone") {
+      setCustomer((prev) => ({
+        ...prev,
+        phone: value.replace(/\D/g, "").slice(0, 10),
+      }));
+      return;
+    }
+
     setCustomer((prev) => ({
       ...prev,
       [name]: value,
@@ -81,12 +162,15 @@ export default function CheckoutDetailsModal({
       return "Please enter a valid 10-digit phone number.";
     }
     if (!customer.address.trim()) return "Please enter address.";
-    if (!customer.city.trim()) return "Please enter city.";
-    if (!customer.state.trim()) return "Please enter state.";
+    if (countWords(customer.address) < MIN_ADDRESS_WORDS) {
+      return `Address must be at least ${MIN_ADDRESS_WORDS} words.`;
+    }
     if (!customer.pincode.trim()) return "Please enter pincode.";
     if (!/^\d{6}$/.test(customer.pincode)) {
       return "Please enter a valid 6-digit pincode.";
     }
+    if (!customer.city.trim()) return "Please enter city.";
+    if (!customer.state.trim()) return "Please enter state.";
     return "";
   };
 
@@ -114,7 +198,7 @@ export default function CheckoutDetailsModal({
         }}
       />
 
-      <div className="relative z-10 w-full h-[90vh] overflow-auto max-w-2xl rounded-2xl bg-white shadow-2xl">
+      <div className="relative z-10 h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white shadow-2xl">
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -174,6 +258,7 @@ export default function CheckoutDetailsModal({
                 onChange={handleChange}
                 placeholder="Enter phone number"
                 maxLength={10}
+                inputMode="numeric"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
               />
             </div>
@@ -186,10 +271,56 @@ export default function CheckoutDetailsModal({
                 name="address"
                 value={customer.address}
                 onChange={handleChange}
-                placeholder="House no, street, area"
+                placeholder="House no, street, area, landmark"
                 rows={3}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
               />
+              <p
+                className={[
+                  "mt-1.5 text-xs",
+                  countWords(customer.address) >= MIN_ADDRESS_WORDS
+                    ? "text-emerald-700"
+                    : "text-slate-500",
+                ].join(" ")}
+              >
+                {countWords(customer.address)}/{MIN_ADDRESS_WORDS} words minimum
+              </p>
+            </div>
+
+            <div className="sm:col-span-2 sm:max-w-xs">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Pincode
+              </label>
+              <input
+                type="text"
+                name="pincode"
+                value={customer.pincode}
+                onChange={handleChange}
+                placeholder="6-digit pincode"
+                maxLength={6}
+                inputMode="numeric"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
+              />
+              {pincodeLoading ? (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Looking up city and state...
+                </p>
+              ) : pincodeHint ? (
+                <p
+                  className={[
+                    "mt-1.5 text-xs",
+                    pincodeHint.includes("filled")
+                      ? "text-emerald-700"
+                      : "text-amber-700",
+                  ].join(" ")}
+                >
+                  {pincodeHint}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  City and state auto-fill when pincode is entered.
+                </p>
+              )}
             </div>
 
             <div>
@@ -201,7 +332,7 @@ export default function CheckoutDetailsModal({
                 name="city"
                 value={customer.city}
                 onChange={handleChange}
-                placeholder="Enter city"
+                placeholder="Auto-filled from pincode"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
               />
             </div>
@@ -215,22 +346,7 @@ export default function CheckoutDetailsModal({
                 name="state"
                 value={customer.state}
                 onChange={handleChange}
-                placeholder="Enter state"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Pincode
-              </label>
-              <input
-                type="text"
-                name="pincode"
-                value={customer.pincode}
-                onChange={handleChange}
-                placeholder="Enter pincode"
-                maxLength={6}
+                placeholder="Auto-filled from pincode"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
               />
             </div>
@@ -264,7 +380,7 @@ export default function CheckoutDetailsModal({
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || pincodeLoading}
                 className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {loading ? "Please wait..." : "Continue"}
