@@ -38,7 +38,7 @@ export default function PaymentMethodModal({
           >
             <p className="text-sm font-semibold text-slate-900">NSDL</p>
             <p className="mt-1 text-xs text-slate-500">
-              UPI / redirect via NineteenPay NSDL collect
+              UPI / NSDL Bank
             </p>
           </button>
 

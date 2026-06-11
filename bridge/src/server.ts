@@ -26,6 +26,10 @@ import {
   normalizeEasebuzzStatusResponse,
   type EasebuzzConfig,
 } from "./easebuzz.js";
+import {
+  resolveBridgePublicUrl,
+  resolveStorefrontUrl,
+} from "./public-url.js";
 
 // ── Environment ────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3000);
@@ -47,12 +51,6 @@ const EASEBUZZ_URL =
 const EASEBUZZ_STATUS_URL =
   process.env.EASEBUZZ_STATUS_URL ??
   "https://dashboard.easebuzz.in/transaction/v2.1/retrieve";
-const STOREFRONT_URL =
-  process.env.STOREFRONT_URL ?? "http://localhost:5173";
-const BRIDGE_PUBLIC_URL = (
-  process.env.BRIDGE_PUBLIC_URL ?? `http://localhost:${PORT}`
-).replace(/\/+$/, "");
-
 const easebuzzConfig: EasebuzzConfig | null =
   EASEBUZZ_KEY && EASEBUZZ_SALT
     ? {
@@ -503,8 +501,15 @@ async function handleEasebuzzCreatePayment(req: Request, res: Response) {
   }
 
   // Easebuzz POSTs form data to surl/furl — must hit the bridge, not the Vite SPA.
-  const successUrl = surl || `${BRIDGE_PUBLIC_URL}/api/easebuzz/return?outcome=success`;
-  const failureUrl = furl || `${BRIDGE_PUBLIC_URL}/api/easebuzz/return?outcome=failed`;
+  const bridgePublicUrl = resolveBridgePublicUrl(req, PORT);
+  const successUrl =
+    surl || `${bridgePublicUrl}/api/easebuzz/return?outcome=success`;
+  const failureUrl =
+    furl || `${bridgePublicUrl}/api/easebuzz/return?outcome=failed`;
+
+  console.log(
+    `[easebuzz-create] txnid=${txnid} surl=${successUrl} furl=${failureUrl}`,
+  );
 
   const result = await initiateEasebuzzPayment(easebuzzConfig, {
     txnid,
@@ -735,7 +740,9 @@ function handleEasebuzzReturn(req: Request, res: Response) {
     params.set("status", "failed");
   }
 
-  const redirectUrl = `${STOREFRONT_URL.replace(/\/+$/, "")}/order-success?${params}`;
+  const storefrontUrl = resolveStorefrontUrl(req);
+  const redirectUrl = `${storefrontUrl}/order-success?${params}`;
+  console.log(`[easebuzz-return] txnid=${txnid} redirect=${redirectUrl}`);
   res.redirect(302, redirectUrl);
 }
 
