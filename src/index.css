@@ -1,1 +1,29 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.landing-swiper .swiper-pagination {
+  bottom: 1.5rem !important;
+}
+
+.landing-swiper .swiper-pagination-bullet {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: rgba(255, 255, 255, 0.45);
+  opacity: 1;
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.landing-swiper .swiper-pagination-bullet-active {
+  width: 1.75rem;
+  border-radius: 9999px;
+  background: white;
+}
