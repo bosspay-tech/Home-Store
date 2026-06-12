@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { EFFECTIVE_DATE, LEGAL } from "../config/legal";
+
 export default function ReturnsRefundsPolicy() {
   return (
     <div className="bg-linear-to-b from-slate-50 to-white">
@@ -7,144 +10,219 @@ export default function ReturnsRefundsPolicy() {
             Returns & Refunds Policy
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Effective date: {new Date().toLocaleDateString()}
+            Effective date: {EFFECTIVE_DATE}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {LEGAL.companyName} ({LEGAL.brandName})
           </p>
 
           <div className="mt-8 space-y-6 text-sm leading-6 text-slate-700">
-            {/* Return Window */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Return Window
+                1. Overview
+              </h2>
+              <p className="mt-2">
+                We want you to receive the correct products in good condition.
+                This policy explains when returns, replacements, or refunds are
+                available. All orders are prepaid online; we do not offer Cash on
+                Delivery (COD).
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                2. Return Window
               </h2>
               <p className="mt-2">
                 Return requests must be raised within <b>7 days</b> of delivery.
-                Requests submitted after this period may not be accepted.
+                Requests after this period may not be accepted unless required by
+                applicable consumer protection law.
               </p>
             </section>
 
-            {/* Eligibility */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Eligibility
+                3. Eligible Reasons
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>Wrong item delivered (not matching your order invoice)</li>
+                <li>Item missing from the parcel</li>
                 <li>
-                  Returns are accepted only if you received an incorrect item or
-                  an item not listed on your bill due to our error.
+                  Product received damaged, leaking, or broken in transit
+                  (with proof)
                 </li>
                 <li>
-                  Customers are strongly advised to record a video while opening
-                  the parcel as proof for damaged or incorrect items.
-                </li>
-                <li>
-                  For branded items, returns are accepted only if original
-                  packaging and all contents are intact.
-                </li>
-                <li>
-                  Personalized or customized products cannot be cancelled or
-                  returned once processed.
+                  Significant defect making the product unfit for use (subject to
+                  inspection)
                 </li>
               </ul>
             </section>
 
-            {/* Return Authorization */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Return Authorization & Process
+                4. Non-Returnable Items
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                  A return authorization is mandatory before sending any product
-                  back.
+                  Opened or used liquids, disinfectants, and hygiene products
+                  (unless damaged/defective on arrival)
                 </li>
                 <li>
-                  Products sent without authorization will be returned to the
-                  sender.
+                  Products with broken seals, missing labels, or tampered
+                  packaging due to customer handling
+                </li>
+                <li>Personalised or custom-made products</li>
+                <li>
+                  Items marked non-returnable on the product page at time of
+                  purchase
                 </li>
                 <li>
-                  Once approved, we will provide a return shipping label or
-                  instructions.
-                </li>
-                <li>
-                  Customers must securely pack the product with all original
-                  contents. Original packaging is recommended.
-                </li>
-                <li>
-                  We recommend recording a video while packing the return. Our
-                  team may also record an unboxing video upon receipt for
-                  verification.
+                  Returns arising from incorrect address or refusal at delivery
                 </li>
               </ul>
             </section>
 
-            {/* How to Request */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                How to Request a Return
+                5. Proof Required
+              </h2>
+              <p className="mt-2">
+                For damaged or incorrect items, please provide clear photos or an
+                unboxing video showing the outer package and the product issue.
+                We strongly recommend recording video while opening the parcel.
+                Claims without adequate proof may be declined.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                6. How to Request a Return
               </h2>
               <ol className="mt-2 list-decimal space-y-1 pl-5">
                 <li>
-                  Email <b>support@vyaparvaultpvt.shop</b> with your{" "}
-                  <b>Order ID</b>.
+                  Email <b>{LEGAL.email}</b> or use our{" "}
+                  <Link to="/contact" className="font-semibold text-slate-900 underline">
+                    contact page
+                  </Link>{" "}
+                  within the return window.
                 </li>
                 <li>
-                  Share images or video evidence of the issue (damaged/incorrect
-                  item).
+                  Include your <b>order reference</b> (e.g. ORD…), registered
+                  phone/email, and a description of the issue.
                 </li>
-                <li>Our team will verify and confirm the next steps.</li>
+                <li>Attach photos or video evidence where applicable.</li>
+                <li>Wait for return authorisation before shipping any product back.</li>
               </ol>
             </section>
 
-            {/* Refunds */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Refunds
+                7. Return Authorisation & Pickup
               </h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                  Once the returned item passes inspection, refunds are
-                  processed within <b>5–10 business days</b>.
+                  Returns are accepted only after written authorisation from our
+                  support team.
                 </li>
                 <li>
-                  Refunds are issued to the original payment method or via bank
-                  transfer/UPI (for COD orders).
+                  Unauthorised returns may be refused or sent back to the sender.
                 </li>
-                <li>Packaging and shipping charges are non-refundable.</li>
+                <li>
+                  We may arrange reverse pickup or provide return instructions
+                  depending on your pincode and courier coverage.
+                </li>
+                <li>
+                  Products must be securely packed with all contents and original
+                  packaging where possible.
+                </li>
               </ul>
             </section>
 
-            {/* Replacement */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Replacement
+                8. Cancellations
               </h2>
               <p className="mt-2">
-                If the product is eligible, we may offer a replacement of the
-                same item (subject to availability). If unavailable, a refund or
-                store credit will be provided.
+                You may request cancellation before the order is dispatched by
+                emailing <b>{LEGAL.email}</b> with your order reference. If
+                already shipped, cancellation is not possible; you may request a
+                return only if eligible under this policy after delivery.
               </p>
             </section>
 
-            {/* Damaged */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Damaged / Incorrect Item
+                9. Refunds
+              </h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>
+                  Approved refunds are processed within{" "}
+                  <b>5–10 business days</b> after we receive and inspect the
+                  returned item (or confirm a delivery issue without return, where
+                  applicable).
+                </li>
+                <li>
+                  Refunds are credited to the <b>original payment method</b> used
+                  at checkout (UPI, card, or netbanking via our payment partner).
+                </li>
+                <li>
+                  Shipping charges are non-refundable unless the return is due to
+                  our error (wrong/damaged item).
+                </li>
+                <li>
+                  Failed or cancelled payments: no charge is completed; you may
+                  retry payment from the order page for pending orders.
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                10. Replacement
               </h2>
               <p className="mt-2">
-                If you receive a damaged or incorrect item, please contact us
-                within <b>48 hours</b> of delivery with supporting images or
-                video proof. We will resolve the issue via replacement or
-                refund.
+                Where eligible, we may offer a replacement of the same product
+                (subject to stock). If unavailable, a refund will be issued to
+                your original payment method.
               </p>
             </section>
 
-            {/* Contact */}
             <section>
               <h2 className="text-base font-semibold text-slate-900">
-                Need Help?
+                11. Damaged / Incorrect on Arrival
               </h2>
               <p className="mt-2">
-                Reach us at <b>support@vyaparvaultpvt.shop</b>.
+                Report damaged or incorrect deliveries within{" "}
+                <b>48 hours</b> of delivery with photos or video. We will review
+                and offer replacement or refund as appropriate.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                12. Consumer Rights
+              </h2>
+              <p className="mt-2">
+                Nothing in this policy limits your statutory rights under
+                applicable Indian consumer protection laws.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-base font-semibold text-slate-900">
+                13. Contact
+              </h2>
+              <p className="mt-2">
+                Email: <b>{LEGAL.email}</b> · Phone: <b>{LEGAL.phone}</b>
+                <br />
+                {LEGAL.address}
+                <br />
+                GST: {LEGAL.gst} · CIN: {LEGAL.cin}
+              </p>
+              <p className="mt-2">
+                <Link to="/contact" className="font-semibold text-slate-900 underline">
+                  Contact us
+                </Link>
               </p>
             </section>
           </div>
