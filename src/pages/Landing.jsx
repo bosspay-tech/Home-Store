@@ -18,6 +18,7 @@ import "swiper/css/pagination";
 
 import { supabase } from "../lib/supabase";
 import { STORE_ID } from "../config/store";
+import { FREE_SHIPPING_MIN } from "../lib/shipping";
 import ProductCard from "../components/ProductCard";
 
 const HERO_SLIDES = [
@@ -167,7 +168,10 @@ export default function Landing() {
       <div className="border-b border-emerald-100 bg-emerald-50/80">
         <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-4 py-2.5 text-center text-xs font-medium text-emerald-900 sm:text-sm">
           <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Free shipping on orders above ₹499 · Secure UPI & card checkout</span>
+          <span>
+            Free shipping on orders above ₹{FREE_SHIPPING_MIN} · Secure UPI &
+            card checkout
+          </span>
         </div>
       </div>
 

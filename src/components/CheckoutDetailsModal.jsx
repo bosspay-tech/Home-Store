@@ -37,9 +37,16 @@ export default function CheckoutDetailsModal({
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [pincodeHint, setPincodeHint] = useState("");
   const lastLookupRef = useRef("");
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
 
     setCustomer({
       name: "",
@@ -54,7 +61,15 @@ export default function CheckoutDetailsModal({
     setError("");
     setPincodeHint("");
     lastLookupRef.current = "";
-  }, [open, user]);
+  }, [open, user?.email]);
+
+  useEffect(() => {
+    if (!open || !user?.email) return;
+
+    setCustomer((prev) =>
+      prev.email.trim() ? prev : { ...prev, email: user.email },
+    );
+  }, [open, user?.email]);
 
   useEffect(() => {
     if (!open) return;

@@ -6,6 +6,8 @@ import { STORE_ID } from "../config/store";
 import { useAuth } from "../features/auth/useAuth";
 import CheckoutDetailsModal from "../components/CheckoutDetailsModal";
 import PaymentMethodModal from "../components/PaymentMethodModal";
+import { FREE_SHIPPING_MIN, getShippingQuote } from "../lib/shipping";
+import { createPaymentSession, savePaymentSession } from "../lib/payment";
 
 function formatMoney(n) {
   const num = Number(n || 0);
@@ -25,6 +27,7 @@ export default function Checkout() {
   const [error, setError] = useState("");
 
   const subtotal = useMemo(() => Number(total()), [total]);
+  const quote = useMemo(() => getShippingQuote(subtotal), [subtotal]);
   const totalItems = useMemo(
     () => items.reduce((sum, it) => sum + Number(it.quantity || 0), 0),
     [items],
@@ -35,7 +38,7 @@ export default function Checkout() {
       store_id: STORE_ID,
       user_id: user?.id || null,
       items,
-      total: subtotal,
+      total: quote.grandTotal,
       transaction_id: collectRef,
       status: "pending",
       customer_name: customer.name,
@@ -81,40 +84,19 @@ export default function Checkout() {
 
       const customer = pendingCustomer;
       const collectRef = pendingCollectRef;
-      const endpoint =
-        gateway === "easebuzz"
-          ? "/api/easebuzz/create-payment"
-          : "/api/nineteenpay/create-payment";
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: subtotal,
-          collect_ref: collectRef,
-          display_name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          user_ref: customer.phone,
-          txn_note: `Order ${collectRef}`,
-          productinfo: `Home Store order ${collectRef}`,
-          idempotency_key: collectRef,
-          address1: customer.address,
-          city: customer.city,
-          state: customer.state,
-          zipcode: customer.pincode,
-          country: "India",
-        }),
+      const data = await createPaymentSession({
+        gateway,
+        collectRef,
+        amount: quote.grandTotal,
+        customer,
       });
-
-      const data = await response.json();
 
       if (!data.success || !data.checkoutUrl) {
         throw new Error(data.error || "Failed to create payment");
       }
 
-      sessionStorage.setItem("payment_gateway", gateway);
-      sessionStorage.setItem("payment_collect_ref", collectRef);
+      savePaymentSession(gateway, collectRef);
 
       if (data.checkoutUrl.startsWith("upi://")) {
         setUpiUrl(data.checkoutUrl);
@@ -178,7 +160,7 @@ export default function Checkout() {
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">
                 <span className="text-slate-500">Total:</span>{" "}
                 <span className="font-semibold text-slate-900">
-                  {formatMoney(subtotal)}
+                  {formatMoney(quote.grandTotal)}
                 </span>
               </div>
             </div>
@@ -264,8 +246,21 @@ export default function Checkout() {
 
                     <div className="mt-2 flex items-center justify-between text-sm text-slate-700">
                       <span>Shipping</span>
-                      <span className="text-slate-500">Calculated later</span>
+                      {quote.isFree ? (
+                        <span className="font-semibold text-emerald-700">Free</span>
+                      ) : (
+                        <span className="font-semibold text-slate-900">
+                          {formatMoney(quote.shipping)}
+                        </span>
+                      )}
                     </div>
+
+                    {!quote.isFree ? (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Add {formatMoney(quote.amountAwayFromFree)} more for free
+                        shipping on orders above {formatMoney(FREE_SHIPPING_MIN)}.
+                      </p>
+                    ) : null}
 
                     <div className="my-3 h-px bg-slate-200" />
 
@@ -274,7 +269,7 @@ export default function Checkout() {
                         Total
                       </span>
                       <span className="text-lg font-extrabold text-slate-900">
-                        {formatMoney(subtotal)}
+                        {formatMoney(quote.grandTotal)}
                       </span>
                     </div>
                   </div>
@@ -312,7 +307,7 @@ export default function Checkout() {
                 >
                   {loading
                     ? "Redirecting..."
-                    : `Place Order • ${formatMoney(subtotal)}`}
+                    : `Place Order • ${formatMoney(quote.grandTotal)}`}
                 </button>
 
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
@@ -339,7 +334,7 @@ export default function Checkout() {
         }}
         onConfirm={handleCheckoutConfirm}
         loading={loading}
-        amount={subtotal}
+        amount={quote.grandTotal}
         user={user}
       />
 
@@ -353,7 +348,7 @@ export default function Checkout() {
         }}
         onSelect={handlePaymentMethodSelect}
         loading={loading}
-        amount={subtotal}
+        amount={quote.grandTotal}
         customerName={pendingCustomer?.name || ""}
       />
       {upiUrl && (

@@ -10,31 +10,64 @@ function firstOrigin(value?: string): string | null {
   return `https://${first.replace(/\/+$/, "")}`;
 }
 
+function isLocalhostHost(host?: string): boolean {
+  if (!host) return false;
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".local")
+  );
+}
+
 function isLocalhost(url: string): boolean {
   try {
-    const host = new URL(url).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+    return isLocalhostHost(new URL(url).hostname);
   } catch {
     return url.includes("localhost") || url.includes("127.0.0.1");
   }
 }
 
+function requestHost(req: Request): string | null {
+  return (
+    req.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    req.get("host") ||
+    null
+  );
+}
+
+function isLocalDevRequest(req: Request): boolean {
+  if (isLocalhostHost(requestHost(req) ?? undefined)) return true;
+  if (process.env.NODE_ENV === "development") return true;
+  return false;
+}
+
 function originFromRequest(req: Request): string | null {
-  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || req.get("host");
+  const host = requestHost(req);
   if (!host) return null;
 
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const proto = forwardedProto || (req.secure ? "https" : "http");
   const origin = `${proto}://${host}`.replace(/\/+$/, "");
+
   if (isLocalhost(origin)) return null;
   return origin;
+}
+
+function isBossPayApiUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "api.bosspay24.com";
+  } catch {
+    return url.includes("api.bosspay24.com");
+  }
 }
 
 function resolveFromEnv(...keys: string[]): string | null {
   for (const key of keys) {
     const value = firstOrigin(process.env[key]);
-    if (value && !isLocalhost(value)) return value;
+    if (!value || isLocalhost(value) || isBossPayApiUrl(value)) continue;
+    return value;
   }
   return null;
 }
@@ -44,6 +77,14 @@ export function resolveBridgePublicUrl(
   req: Request,
   fallbackPort = 3000,
 ): string {
+  if (isLocalDevRequest(req)) {
+    const devOverride = firstOrigin(process.env.BRIDGE_PUBLIC_URL);
+    if (devOverride && isLocalhost(devOverride)) {
+      return devOverride;
+    }
+    return `http://localhost:${fallbackPort}`;
+  }
+
   return (
     resolveFromEnv(
       "BRIDGE_PUBLIC_URL",
@@ -59,11 +100,31 @@ export function resolveBridgePublicUrl(
 
 /** Storefront base (browser redirect after payment). */
 export function resolveStorefrontUrl(req: Request): string {
+  if (isLocalDevRequest(req)) {
+    const devOverride = firstOrigin(process.env.STOREFRONT_URL);
+    if (devOverride && isLocalhost(devOverride)) {
+      return devOverride;
+    }
+    return (
+      firstOrigin(process.env.STOREFRONT_DEV_URL)?.replace(/\/+$/, "") ??
+      "http://localhost:5173"
+    );
+  }
+
   const coolifyFqdn = process.env.COOLIFY_FQDN?.split(",")[0]?.trim();
-  const fromFqdn = coolifyFqdn ? `https://${coolifyFqdn.replace(/\/+$/, "")}` : null;
+  const fromFqdn = coolifyFqdn
+    ? `https://${coolifyFqdn.replace(/\/+$/, "")}`
+    : null;
 
   return (
-    resolveFromEnv("STOREFRONT_URL", "COOLIFY_URL", "PUBLIC_URL", "APP_URL") ??
+    resolveFromEnv(
+      "STOREFRONT_URL",
+      "BRIDGE_BASE_URL",
+      "BRIDGE_PUBLIC_URL",
+      "COOLIFY_URL",
+      "PUBLIC_URL",
+      "APP_URL",
+    ) ??
     (fromFqdn && !isLocalhost(fromFqdn) ? fromFqdn : null) ??
     originFromRequest(req) ??
     "http://localhost:5173"

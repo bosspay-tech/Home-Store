@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useCartStore } from "../store/cart.store";
 import { normalizeHttpsUrl } from "../components/ProductCard";
+import { FREE_SHIPPING_MIN, getShippingQuote } from "../lib/shipping";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=70";
@@ -84,6 +85,7 @@ export default function Cart() {
     (sum, it) => sum + Number(it.quantity || 0),
     0,
   );
+  const quote = getShippingQuote(total());
 
   return (
     <div className="min-h-[70vh] bg-linear-to-b from-slate-50 to-white">
@@ -107,7 +109,7 @@ export default function Cart() {
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">
               <span className="text-slate-500">Total:</span>{" "}
               <span className="font-semibold text-slate-900">
-                {formatMoney(total())}
+                {formatMoney(quote.grandTotal)}
               </span>
             </div>
           </div>
@@ -276,8 +278,25 @@ export default function Cart() {
 
                 <div className="flex items-center justify-between text-slate-700">
                   <span>Shipping</span>
-                  <span className="text-slate-500">Calculated at checkout</span>
+                  {quote.isFree ? (
+                    <span className="font-semibold text-emerald-700">Free</span>
+                  ) : (
+                    <span className="font-semibold text-slate-900">
+                      {formatMoney(quote.shipping)}
+                    </span>
+                  )}
                 </div>
+
+                {!quote.isFree ? (
+                  <p className="text-xs text-slate-500">
+                    Add {formatMoney(quote.amountAwayFromFree)} more for free
+                    shipping on orders above {formatMoney(FREE_SHIPPING_MIN)}.
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-700">
+                    You qualify for free shipping.
+                  </p>
+                )}
 
                 <div className="my-3 h-px bg-slate-200" />
 
@@ -286,7 +305,7 @@ export default function Cart() {
                     Total
                   </span>
                   <span className="text-lg font-extrabold text-slate-900">
-                    {formatMoney(total())}
+                    {formatMoney(quote.grandTotal)}
                   </span>
                 </div>
               </div>
