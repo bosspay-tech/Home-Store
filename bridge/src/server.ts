@@ -7,6 +7,11 @@ import {
   createBossPayBridge,
   toExpress,
   SupabaseTxnStore,
+  type BridgeHandlers,
+  type CollectRequest,
+  type CollectResult,
+  type StatusRequest,
+  type StatusResult,
 } from "@bosspay/bridge-node";
 import { createClient } from "@supabase/supabase-js";
 import { createNineteenPayHandlers } from "./handlers.js";
@@ -24,6 +29,7 @@ import {
   initiateEasebuzzPayment,
   retrieveEasebuzzTransaction,
   normalizeEasebuzzStatusResponse,
+  resolveEasebuzzStatus,
   type EasebuzzConfig,
 } from "./easebuzz.js";
 import {
@@ -96,11 +102,87 @@ const nineteenPayConfig: NineteenPayConfig = {
   apiBase: NP_API_BASE!,
 };
 
-const handlers = createNineteenPayHandlers(
-  nineteenPayConfig,
-  BRIDGE_BASE_URL!,
-  supabaseClient,
-);
+// NineteenPay handlers, keyed by `pg_type` (this is what the bridge dispatches
+// `/bosspay/v1/*` on and what `/health` reports as `enabled_pgs`).
+const handlers: BridgeHandlers = {
+  ...createNineteenPayHandlers(nineteenPayConfig, BRIDGE_BASE_URL!, supabaseClient),
+};
+
+// ── Easebuzz, registered as a first-class bridge PG (additive) ─────────
+// Without this, DollerpayX's `/bosspay/v1/collect` for `pg_type=easebuzz`
+// gets `PG_NOT_CONFIGURED` and `/health` only lists `nineteenpay`.
+//
+// Ops decision: the lender bridge stays LIGHT. It only calls Easebuzz
+// `initiateLink` (which needs the key/salt that live on this host) and returns
+// the payment LINK. DollerpayX mints the `upi://` deeplink from that link on
+// its own servers (Easebuzz has no IP allow-list). So `createCollection` does
+// NOT run `submitInitiatePayment` here.
+//
+// The existing `/api/easebuzz/*` storefront routes and the 19Pay path are
+// unchanged — this only adds a new key to the dispatch map.
+if (easebuzzConfig) {
+  const ezbConfig = easebuzzConfig;
+  handlers.easebuzz = {
+    createCollection: async (req: CollectRequest): Promise<CollectResult> => {
+      const txnid = req.txn_id;
+      const amountRupees = req.amount / 100; // DPX sends paisa; Easebuzz wants rupees
+      const email =
+        req.customer_email && req.customer_email.includes("@")
+          ? req.customer_email
+          : "customer@dollerpayx.in";
+      const phone =
+        (req.customer_phone || "").replace(/\D/g, "").slice(-10) || "9999999999";
+      const firstname =
+        req.customer_email?.split("@")[0]?.trim() || "Customer";
+
+      // surl/furl reuse the existing storefront return handler so the hosted-page
+      // fallback keeps working; the authoritative status path is webhook + retrieve.
+      const surl = `${BRIDGE_BASE_URL}/api/easebuzz/return?outcome=success`;
+      const furl = `${BRIDGE_BASE_URL}/api/easebuzz/return?outcome=failed`;
+
+      const result = await initiateEasebuzzPayment(ezbConfig, {
+        txnid,
+        amount: amountRupees,
+        productinfo: `Order ${txnid}`,
+        firstname,
+        email,
+        phone,
+        surl,
+        furl,
+        udf1: txnid,
+      });
+
+      // Return only the Easebuzz payment LINK — DollerpayX mints the deeplink.
+      return {
+        payment_url: result.checkoutUrl,
+        pg_transaction_id: txnid,
+        mode: "redirect",
+      };
+    },
+
+    checkStatus: async (req: StatusRequest): Promise<StatusResult> => {
+      const result = await retrieveEasebuzzTransaction(ezbConfig, req.pg_txn_id);
+      const normalized = normalizeEasebuzzStatusResponse(result, req.pg_txn_id);
+      if (!normalized.success || !normalized.data.length) {
+        return { status: "pending", pg_transaction_id: req.pg_txn_id, amount: 0 };
+      }
+      const row = normalized.data[0] as {
+        status?: string;
+        amount?: unknown;
+        raw?: Record<string, unknown>;
+      };
+      const amountPaisa = Math.max(0, Math.round(Number(row.amount ?? 0) * 100));
+      return {
+        status: resolveEasebuzzStatus(String(row.status ?? "")),
+        pg_transaction_id: req.pg_txn_id,
+        amount: amountPaisa,
+        ...(row.raw ? { raw_pg_response: row.raw } : {}),
+      };
+    },
+
+    isAvailable: async () => true,
+  };
+}
 
 // ── BossPay Bridge ─────────────────────────────────────────────────
 const bridge = createBossPayBridge({
