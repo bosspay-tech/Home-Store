@@ -616,9 +616,9 @@ export default function ProductDetail() {
                     Check
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-slate-600">
+                {/* <p className="mt-2 text-xs text-slate-600">
                   {pinMsg || "COD may be available. Easy returns."}
-                </p>
+                </p> */}
               </div>
 
               <div className="mt-6 flex flex-col gap-3">
