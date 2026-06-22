@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { sendEmailOtp, verifyEmailOtp } from "./auth.service";
+import { sendEmailOtp, verifyEmailOtp, loginTestUser } from "./auth.service";
+import { isTestEmail } from "../../config/testAuth";
 import AuthLayout, {
   AuthAlert,
   AuthField,
@@ -19,6 +20,8 @@ function isValidOtp(otp) {
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get("next") || "/";
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -64,6 +67,17 @@ export default function Login() {
 
     setSendingOtp(true);
     try {
+      if (isTestEmail(email)) {
+        const { error } = await loginTestUser({ email: email.trim() });
+        if (error) {
+          setFormError(error.message || "Test login failed.");
+          return;
+        }
+        toast.success("Signed in.");
+        navigate(nextPath.startsWith("/") ? nextPath : "/");
+        return;
+      }
+
       const { error } = await sendEmailOtp({
         email: email.trim(),
         shouldCreateUser: false,
@@ -116,7 +130,7 @@ export default function Login() {
       }
 
       toast.success("Login verified.");
-      navigate("/");
+      navigate(nextPath.startsWith("/") ? nextPath : "/");
     } catch {
       setFormError(
         "Something went wrong while verifying OTP. Please try again.",
@@ -217,8 +231,12 @@ export default function Login() {
               ? "Verifying OTP..."
               : "Verify & sign in"
             : sendingOtp
-              ? "Sending OTP..."
-              : "Send OTP"}
+              ? isTestEmail(email)
+                ? "Signing in..."
+                : "Sending OTP..."
+              : isTestEmail(email)
+                ? "Sign in"
+                : "Send OTP"}
         </AuthSubmitButton>
       </form>
     </AuthLayout>

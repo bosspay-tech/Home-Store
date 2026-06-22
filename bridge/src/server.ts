@@ -67,6 +67,19 @@ const easebuzzConfig: EasebuzzConfig | null =
       }
     : null;
 
+const TESTE_EMAIL = process.env.TESTE?.trim().toLowerCase() || "";
+const TESTE_PASSWORD = process.env.TESTE_PASSWORD || "testvp@123";
+
+if (
+  SUPABASE_SERVICE_ROLE_KEY?.startsWith("sb_publishable_") ||
+  SUPABASE_SERVICE_ROLE_KEY?.includes("publishable")
+) {
+  console.error(
+    "[auth] SUPABASE_SERVICE_ROLE_KEY looks like a publishable key. " +
+      "Use the service_role secret from Supabase → Settings → API.",
+  );
+}
+
 // ── Validate required env vars exist ───────────────────────────────
 const missing = (
   [
@@ -535,6 +548,90 @@ app.post("/wp-json/bosspay/v1/callback/nineteenpay/:txnId", async (req, res) =>
 );
 
 // ── Legacy Home-Store API routes (Frontend compatibility) ──
+
+async function handleTestLogin(req: Request, res: Response) {
+  if (!TESTE_EMAIL) {
+    res.status(403).json({ error: "Test login is not enabled." });
+    return;
+  }
+
+  const email = String(req.body?.email || "")
+    .trim()
+    .toLowerCase();
+  if (!email || email !== TESTE_EMAIL) {
+    res.status(403).json({ error: "This email is not allowed for test login." });
+    return;
+  }
+
+  const fullName = String(req.body?.full_name || "").trim();
+  const phone = String(req.body?.phone || "").trim();
+  const metadata = {
+    ...(fullName ? { full_name: fullName } : {}),
+    ...(phone ? { phone } : {}),
+  };
+
+  let signIn = await supabaseClient.auth.signInWithPassword({
+    email,
+    password: TESTE_PASSWORD,
+  });
+
+  if (signIn.error) {
+    const created = await supabaseClient.auth.admin.createUser({
+      email,
+      password: TESTE_PASSWORD,
+      email_confirm: true,
+      user_metadata: metadata,
+    });
+
+    if (created.error && !/already|registered|exists/i.test(created.error.message)) {
+      res.status(500).json({
+        error: created.error.message || "Could not create test user.",
+      });
+      return;
+    }
+
+    if (created.data.user && Object.keys(metadata).length) {
+      await supabaseClient.auth.admin.updateUserById(created.data.user.id, {
+        user_metadata: metadata,
+      });
+    }
+
+    signIn = await supabaseClient.auth.signInWithPassword({
+      email,
+      password: TESTE_PASSWORD,
+    });
+  } else if (signIn.data.user && Object.keys(metadata).length) {
+    await supabaseClient.auth.admin.updateUserById(signIn.data.user.id, {
+      user_metadata: metadata,
+    });
+  }
+
+  const session = signIn.data.session;
+  if (signIn.error || !session) {
+    res.status(500).json({
+      error:
+        signIn.error?.message ||
+        "Could not sign in test user. Check SUPABASE_SERVICE_ROLE_KEY in bridge/.env.",
+    });
+    return;
+  }
+
+  res.json({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  });
+}
+
+app.post("/api/auth/test-login", async (req, res) => {
+  try {
+    await handleTestLogin(req, res);
+  } catch (err) {
+    console.error("test-login error:", err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Test login failed.",
+    });
+  }
+});
 
 async function handleEasebuzzCreatePayment(req: Request, res: Response) {
   if (!easebuzzConfig) {

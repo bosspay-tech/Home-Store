@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { sendEmailOtp, verifyEmailOtp } from "./auth.service";
+import { sendEmailOtp, verifyEmailOtp, loginTestUser } from "./auth.service";
+import { isTestEmail } from "../../config/testAuth";
 import AuthLayout, {
   AuthAlert,
   AuthField,
@@ -126,6 +127,22 @@ export default function Signup() {
     setSendingOtp(true);
     try {
       const formattedPhone = formatIndianPhone(phone);
+
+      if (isTestEmail(email)) {
+        const { error } = await loginTestUser({
+          email: email.trim(),
+          fullName: fullName.trim(),
+          phone: formattedPhone,
+        });
+        if (error) {
+          setFormError(error.message || "Test signup failed.");
+          return;
+        }
+        toast.success("Account ready. You are signed in.");
+        navigate("/");
+        return;
+      }
+
       const { error } = await sendEmailOtp({
         email: email.trim(),
         fullName: fullName.trim(),
@@ -312,8 +329,12 @@ export default function Signup() {
               ? "Verifying OTP..."
               : "Verify & create account"
             : sendingOtp
-              ? "Sending OTP..."
-              : "Send OTP"}
+              ? isTestEmail(email)
+                ? "Creating account..."
+                : "Sending OTP..."
+              : isTestEmail(email)
+                ? "Create account"
+                : "Send OTP"}
         </AuthSubmitButton>
 
         <p className="mt-4 text-center text-xs leading-5 text-slate-500">

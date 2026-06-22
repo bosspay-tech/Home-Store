@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../features/auth/useAuth";
 import { signOut } from "../features/auth/auth.service";
 import { useCartStore } from "../store/cart.store";
+import { isAdminUser } from "../lib/admin";
 
 function cx(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -18,6 +19,8 @@ export default function Navbar() {
     () => items.reduce((sum, it) => sum + (it.qty ?? 1), 0),
     [items],
   );
+
+  const showAdmin = user && isAdminUser(user);
 
   if (loading) return null;
 
@@ -69,6 +72,7 @@ export default function Navbar() {
           {user ? (
             <>
               <NavItem to="/orders">My Orders</NavItem>
+              {showAdmin ? <NavItem to="/admin/products">Admin</NavItem> : null}
               <button
                 onClick={() => {
                   setOpen(false);
@@ -127,6 +131,9 @@ export default function Navbar() {
             {user ? (
               <>
                 <NavItem to="/orders">My Orders</NavItem>
+                {showAdmin ? (
+                  <NavItem to="/admin/products">Admin</NavItem>
+                ) : null}
                 <button
                   onClick={() => {
                     setOpen(false);

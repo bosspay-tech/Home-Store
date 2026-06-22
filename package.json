@@ -11,6 +11,8 @@
     "start": "npm run start --prefix bridge",
     "dev:backend": "npm run dev --prefix bridge",
     "seed:price-points": "node scripts/seed-home-store-price-points.mjs",
+    "round-prices": "node scripts/round-product-prices.mjs",
+    "round-prices:apply": "node scripts/round-product-prices.mjs --apply",
     "lint": "eslint .",
     "preview": "vite preview"
   },

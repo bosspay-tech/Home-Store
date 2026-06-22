@@ -19,6 +19,9 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ContactPage from "./pages/ContactPage";
 import { isSupabaseConfigured } from "./lib/supabase";
+import { AdminRoute } from "./components/AdminRoute";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminProductForm from "./pages/admin/AdminProductForm";
 
 const App = () => {
   return (
@@ -52,6 +55,30 @@ const App = () => {
             <ProtectedRoute>
               <MyOrders />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/products"
+          element={
+            <AdminRoute>
+              <AdminProducts />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/products/new"
+          element={
+            <AdminRoute>
+              <AdminProductForm />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/products/:id/edit"
+          element={
+            <AdminRoute>
+              <AdminProductForm />
+            </AdminRoute>
           }
         />
       </Routes>

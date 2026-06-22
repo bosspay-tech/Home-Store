@@ -61,3 +61,65 @@ export const verifyEmailOtp = async ({
 };
 
 export const signOut = () => supabase.auth.signOut();
+
+export const loginTestUser = async ({
+  email,
+  fullName = "",
+  phone = "",
+}) => {
+  let response;
+  try {
+    response = await fetch("/api/auth/test-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim(),
+        full_name: fullName.trim() || undefined,
+        phone: phone.trim() || undefined,
+      }),
+    });
+  } catch {
+    return {
+      data: null,
+      error: new Error(
+        "Cannot reach the bridge API. Run: npm start (or npm run dev:backend) in another terminal.",
+      ),
+    };
+  }
+
+  const raw = await response.text();
+  let body = {};
+  try {
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    body = { error: raw.slice(0, 200) };
+  }
+
+  if (!response.ok) {
+    const message =
+      body.error ||
+      (response.status === 404
+        ? "Test login route not found. Rebuild bridge: npm run build --prefix bridge"
+        : `Test login failed (HTTP ${response.status}). Ensure bridge runs on port 3000.`);
+    return { data: null, error: new Error(message) };
+  }
+
+  if (body.access_token && body.refresh_token) {
+    return supabase.auth.setSession({
+      access_token: body.access_token,
+      refresh_token: body.refresh_token,
+    });
+  }
+
+  if (body.token_hash) {
+    return supabase.auth.verifyOtp({
+      type: "email",
+      token_hash: body.token_hash,
+    });
+  }
+
+  return {
+    data: null,
+    error: new Error("Test login did not return a session."),
+  };
+};

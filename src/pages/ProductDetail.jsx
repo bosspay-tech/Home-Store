@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { STORE_ID } from "../config/store";
 import { useCartStore } from "../store/cart.store";
 import toast from "react-hot-toast";
+import { productField, productMrp, productAttributeEntries } from "../lib/productFields";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=1400&q=70";
@@ -124,8 +125,7 @@ function formatAttributeValue(value) {
 }
 
 function getAttributeEntries(attributes) {
-  if (!isPlainObject(attributes)) return [];
-  return Object.entries(attributes);
+  return productAttributeEntries(attributes);
 }
 
 function collectionLabelFromKey(key) {
@@ -195,10 +195,10 @@ function SpecificationsList({ product, typeLabel, collectionLabel, attributes })
     ["Collection", collectionLabel],
     ["Item", product?.title],
     ["Quality", "Checked"],
-    ["Pack", product?.pack_size || product?.pack || null],
-    ["Volume", product?.volume || null],
-    ["Material", product?.material || null],
-    ["Recommended use", product?.recommended_use || null],
+    ["Pack", productField(product, "pack_size") || productField(product, "pack")],
+    ["Volume", productField(product, "volume")],
+    ["Material", productField(product, "material")],
+    ["Recommended use", productField(product, "recommended_use")],
     ...attributes.map(([key, value]) => [
       formatAttributeKey(key),
       formatAttributeValue(value),
@@ -364,8 +364,8 @@ export default function ProductDetail() {
     return Number(p);
   }, [selectedVariant, product]);
 
-  const hasMrp = product?.mrp != null && Number(product.mrp) > 0;
-  const mrp = hasMrp ? Number(product.mrp) : null;
+  const mrp = productMrp(product);
+  const hasMrp = mrp != null;
   const discountPct =
     hasMrp && price > 0 ? Math.round(((mrp - price) / mrp) * 100) : null;
 
@@ -478,9 +478,9 @@ export default function ProductDetail() {
                   }}
                 />
 
-                {product?.badge ? (
+                {productField(product, "badge") ? (
                   <span className="absolute left-4 top-4 rounded-full bg-slate-900/90 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-                    {product.badge}
+                    {productField(product, "badge")}
                   </span>
                 ) : null}
 
@@ -571,9 +571,9 @@ export default function ProductDetail() {
                 </span>
               </div>
 
-              {product?.short_description ? (
+              {productField(product, "short_description") ? (
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {product.short_description}
+                  {productField(product, "short_description")}
                 </p>
               ) : null}
 

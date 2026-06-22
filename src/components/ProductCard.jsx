@@ -1,3 +1,5 @@
+import { productField, productMrp } from "../lib/productFields";
+
 export function normalizeHttpsUrl(raw) {
   if (!raw) return "";
 
@@ -18,8 +20,8 @@ export function normalizeHttpsUrl(raw) {
 function ProductCard({ product, onViewDetails }) {
   const price = Number(product?.base_price ?? 0);
   const imageUrl = normalizeHttpsUrl(product?.image_url);
-  const hasMrp = product?.mrp != null && Number(product.mrp) > 0;
-  const mrp = hasMrp ? Number(product.mrp) : null;
+  const mrp = productMrp(product);
+  const hasMrp = mrp != null;
 
   const discountPct =
     hasMrp && price > 0 ? Math.round(((mrp - price) / mrp) * 100) : null;
@@ -46,9 +48,9 @@ function ProductCard({ product, onViewDetails }) {
         />
 
         {/* Badge */}
-        {product?.badge ? (
+        {productField(product, "badge") ? (
           <span className="absolute left-4 top-4 inline-flex items-center rounded-full bg-slate-900/90 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur">
-            {product.badge}
+            {productField(product, "badge")}
           </span>
         ) : null}
 
