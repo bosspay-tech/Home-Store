@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { getAuthRedirectUrl } from "../../config/site";
 
 export const sendEmailOtp = async ({
   email,
@@ -6,10 +7,13 @@ export const sendEmailOtp = async ({
   fullName = "",
   shouldCreateUser = true,
 }) => {
+  const emailRedirectTo = getAuthRedirectUrl("/auth/callback");
+
   return await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser,
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
       data: {
         phone: phone.trim() || null,
         full_name: fullName.trim() || null,

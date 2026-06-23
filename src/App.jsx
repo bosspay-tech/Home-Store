@@ -18,6 +18,7 @@ import ReturnsRefundsPolicy from "./pages/ReturnsRefundsPolicy";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ContactPage from "./pages/ContactPage";
+import AuthCallback from "./pages/AuthCallback";
 import { isSupabaseConfigured } from "./lib/supabase";
 import { AdminRoute } from "./components/AdminRoute";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -42,6 +43,7 @@ const App = () => {
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order-success" element={<OrderSuccess />} />
         <Route path="/shipping" element={<ShippingPolicy />} />
