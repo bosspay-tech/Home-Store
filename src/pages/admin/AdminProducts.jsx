@@ -6,6 +6,7 @@ import {
   fetchAllProductsAdmin,
   setProductActive,
 } from "../../features/admin/product.service";
+import { productField } from "../../lib/productFields";
 
 function formatPrice(value) {
   const n = Number(value);
@@ -17,6 +18,28 @@ function normalizeImageUrl(raw) {
   if (!raw) return "";
   const s = String(raw).trim().replace(/^(https?:)?\/\//i, "");
   return s ? `https://${s}` : "";
+}
+
+function productPrices(product) {
+  return [Number(product.base_price), Number(productField(product, "mrp"))]
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => Math.round(n));
+}
+
+function matchesSearchQuery(product, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const haystack =
+    `${product.title ?? ""} ${product.type ?? ""} ${product.slug ?? ""}`.toLowerCase();
+  if (haystack.includes(q)) return true;
+
+  const priceDigits = q.replace(/[₹,\s]/g, "");
+  if (!/^\d+$/.test(priceDigits)) return false;
+
+  return productPrices(product).some((price) =>
+    String(price).includes(priceDigits),
+  );
 }
 
 export default function AdminProducts() {
@@ -46,13 +69,10 @@ export default function AdminProducts() {
   }, []);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return products.filter((product) => {
       if (filter === "active" && !product.is_active) return false;
       if (filter === "inactive" && product.is_active) return false;
-      if (!q) return true;
-      const haystack = `${product.title ?? ""} ${product.type ?? ""} ${product.slug ?? ""}`.toLowerCase();
-      return haystack.includes(q);
+      return matchesSearchQuery(product, query);
     });
   }, [products, query, filter]);
 
@@ -127,7 +147,7 @@ export default function AdminProducts() {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by title, type, or slug…"
+          placeholder="Search by title, type, slug, or price…"
           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 lg:max-w-md"
         />
         <div className="flex flex-wrap items-center gap-3">

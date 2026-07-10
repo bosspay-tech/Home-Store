@@ -16,6 +16,13 @@ const emptyCustomer = {
   pincode: "",
 };
 
+const emptyBilling = {
+  address: "",
+  city: "",
+  state: "",
+  pincode: "",
+};
+
 const MIN_ADDRESS_WORDS = 8;
 
 function countWords(text) {
@@ -33,10 +40,15 @@ export default function CheckoutDetailsModal({
   subtitle = "Please fill in your billing / shipping details to continue.",
 }) {
   const [customer, setCustomer] = useState(emptyCustomer);
+  const [billing, setBilling] = useState(emptyBilling);
+  const [billingSameAsDelivery, setBillingSameAsDelivery] = useState(true);
   const [error, setError] = useState("");
   const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [billingPincodeLoading, setBillingPincodeLoading] = useState(false);
   const [pincodeHint, setPincodeHint] = useState("");
+  const [billingPincodeHint, setBillingPincodeHint] = useState("");
   const lastLookupRef = useRef("");
+  const lastBillingLookupRef = useRef("");
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -57,10 +69,14 @@ export default function CheckoutDetailsModal({
       state: "",
       pincode: "",
     });
+    setBilling(emptyBilling);
+    setBillingSameAsDelivery(true);
 
     setError("");
     setPincodeHint("");
+    setBillingPincodeHint("");
     lastLookupRef.current = "";
+    lastBillingLookupRef.current = "";
   }, [open, user?.email]);
 
   useEffect(() => {
@@ -140,6 +156,57 @@ export default function CheckoutDetailsModal({
     };
   }, [customer.pincode, open]);
 
+  useEffect(() => {
+    if (!open || billingSameAsDelivery) return undefined;
+
+    const pincode = billing.pincode.replace(/\D/g, "");
+    if (pincode.length !== 6) {
+      setBillingPincodeLoading(false);
+      if (pincode.length < 6) {
+        setBillingPincodeHint("");
+        lastBillingLookupRef.current = "";
+      }
+      return undefined;
+    }
+
+    if (lastBillingLookupRef.current === pincode) return undefined;
+
+    let alive = true;
+    const timer = setTimeout(async () => {
+      setBillingPincodeLoading(true);
+      setBillingPincodeHint("");
+
+      try {
+        const result = await lookupPincode(pincode);
+        if (!alive) return;
+
+        lastBillingLookupRef.current = pincode;
+
+        if (!result) {
+          setBillingPincodeHint("Pincode not found. Enter city and state manually.");
+          return;
+        }
+
+        setBilling((prev) => ({
+          ...prev,
+          city: result.city,
+          state: result.state,
+        }));
+        setBillingPincodeHint("City and state filled from pincode.");
+      } catch {
+        if (!alive) return;
+        setBillingPincodeHint("Could not fetch location. Enter city and state manually.");
+      } finally {
+        if (alive) setBillingPincodeLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [billing.pincode, billingSameAsDelivery, open]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -166,6 +233,38 @@ export default function CheckoutDetailsModal({
     }));
   };
 
+  const handleBillingChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "pincode") {
+      const digits = value.replace(/\D/g, "").slice(0, 6);
+      setBilling((prev) => ({
+        ...prev,
+        pincode: digits,
+      }));
+      return;
+    }
+
+    setBilling((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const validateAddress = (address, pincode, city, state) => {
+    if (!address.trim()) return "Please enter address.";
+    if (countWords(address) < MIN_ADDRESS_WORDS) {
+      return `Address must be at least ${MIN_ADDRESS_WORDS} words.`;
+    }
+    if (!pincode.trim()) return "Please enter pincode.";
+    if (!/^\d{6}$/.test(pincode)) {
+      return "Please enter a valid 6-digit pincode.";
+    }
+    if (!city.trim()) return "Please enter city.";
+    if (!state.trim()) return "Please enter state.";
+    return "";
+  };
+
   const validate = () => {
     if (!customer.name.trim()) return "Please enter full name.";
     if (!customer.email.trim()) return "Please enter email address.";
@@ -176,16 +275,25 @@ export default function CheckoutDetailsModal({
     if (!/^\d{10}$/.test(customer.phone)) {
       return "Please enter a valid 10-digit phone number.";
     }
-    if (!customer.address.trim()) return "Please enter address.";
-    if (countWords(customer.address) < MIN_ADDRESS_WORDS) {
-      return `Address must be at least ${MIN_ADDRESS_WORDS} words.`;
+
+    const deliveryError = validateAddress(
+      customer.address,
+      customer.pincode,
+      customer.city,
+      customer.state,
+    );
+    if (deliveryError) return deliveryError;
+
+    if (!billingSameAsDelivery) {
+      const billingError = validateAddress(
+        billing.address,
+        billing.pincode,
+        billing.city,
+        billing.state,
+      );
+      if (billingError) return `Billing ${billingError.charAt(0).toLowerCase()}${billingError.slice(1)}`;
     }
-    if (!customer.pincode.trim()) return "Please enter pincode.";
-    if (!/^\d{6}$/.test(customer.pincode)) {
-      return "Please enter a valid 6-digit pincode.";
-    }
-    if (!customer.city.trim()) return "Please enter city.";
-    if (!customer.state.trim()) return "Please enter state.";
+
     return "";
   };
 
@@ -199,7 +307,14 @@ export default function CheckoutDetailsModal({
     }
 
     setError("");
-    await onConfirm?.(customer);
+    await onConfirm?.({
+      ...customer,
+      billing_same_as_delivery: billingSameAsDelivery,
+      billing_address: billingSameAsDelivery ? customer.address : billing.address,
+      billing_city: billingSameAsDelivery ? customer.city : billing.city,
+      billing_state: billingSameAsDelivery ? customer.state : billing.state,
+      billing_pincode: billingSameAsDelivery ? customer.pincode : billing.pincode,
+    });
   };
 
   if (!open) return null;
@@ -279,6 +394,9 @@ export default function CheckoutDetailsModal({
             </div>
 
             <div className="sm:col-span-2">
+              <p className="mb-3 text-sm font-semibold text-slate-900">
+                Delivery address
+              </p>
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Address
               </label>
@@ -365,6 +483,116 @@ export default function CheckoutDetailsModal({
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
               />
             </div>
+
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={billingSameAsDelivery}
+                  onChange={(event) => setBillingSameAsDelivery(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">
+                    Billing address same as delivery address
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Uncheck to enter a separate billing address.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {!billingSameAsDelivery ? (
+              <>
+                <div className="sm:col-span-2">
+                  <p className="mb-3 text-sm font-semibold text-slate-900">
+                    Billing address
+                  </p>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Address
+                  </label>
+                  <textarea
+                    name="address"
+                    value={billing.address}
+                    onChange={handleBillingChange}
+                    placeholder="House no, street, area, landmark"
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
+                  />
+                  <p
+                    className={[
+                      "mt-1.5 text-xs",
+                      countWords(billing.address) >= MIN_ADDRESS_WORDS
+                        ? "text-emerald-700"
+                        : "text-slate-500",
+                    ].join(" ")}
+                  >
+                    {countWords(billing.address)}/{MIN_ADDRESS_WORDS} words minimum
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2 sm:max-w-xs">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Pincode
+                  </label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    value={billing.pincode}
+                    onChange={handleBillingChange}
+                    placeholder="6-digit pincode"
+                    maxLength={6}
+                    inputMode="numeric"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
+                  />
+                  {billingPincodeLoading ? (
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Looking up city and state...
+                    </p>
+                  ) : billingPincodeHint ? (
+                    <p
+                      className={[
+                        "mt-1.5 text-xs",
+                        billingPincodeHint.includes("filled")
+                          ? "text-emerald-700"
+                          : "text-amber-700",
+                      ].join(" ")}
+                    >
+                      {billingPincodeHint}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={billing.city}
+                    onChange={handleBillingChange}
+                    placeholder="Auto-filled from pincode"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={billing.state}
+                    onChange={handleBillingChange}
+                    placeholder="Auto-filled from pincode"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
+                  />
+                </div>
+              </>
+            ) : null}
           </div>
 
           {error ? (
@@ -395,7 +623,7 @@ export default function CheckoutDetailsModal({
 
               <button
                 type="submit"
-                disabled={loading || pincodeLoading}
+                disabled={loading || pincodeLoading || billingPincodeLoading}
                 className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {loading ? "Please wait..." : "Continue"}

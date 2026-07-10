@@ -48,6 +48,11 @@ export default function Checkout() {
       customer_city: customer.city,
       customer_state: customer.state,
       customer_pincode: customer.pincode,
+      billing_same_as_delivery: customer.billing_same_as_delivery ?? true,
+      billing_address: customer.billing_address || customer.address,
+      billing_city: customer.billing_city || customer.city,
+      billing_state: customer.billing_state || customer.state,
+      billing_pincode: customer.billing_pincode || customer.pincode,
     });
 
     if (error) {
