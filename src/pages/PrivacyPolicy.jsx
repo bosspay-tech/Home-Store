@@ -90,10 +90,7 @@ export default function PrivacyPolicy() {
                 We share personal data only as needed to operate our store:
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>
-                  <b>Payment partners</b> (e.g. NSDL / NineteenPay, Easebuzz) for
-                  secure payment processing
-                </li>
+              
                 <li>
                   <b>Courier and logistics partners</b> for delivery (name,
                   address, phone)
@@ -102,10 +99,7 @@ export default function PrivacyPolicy() {
                   <b>Technology providers</b> including hosting and database
                   services used to run the website
                 </li>
-                <li>
-                  <b>Authorities</b> when required by law, court order, or to
-                  protect our legal rights
-                </li>
+              
               </ul>
               <p className="mt-2">We do not sell your personal data.</p>
             </section>
